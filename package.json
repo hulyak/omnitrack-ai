@@ -1,0 +1,34 @@
+{
+  "name": "omnitrack-ai",
+  "version": "1.0.0",
+  "description": "Adaptive, collaborative, and intelligent supply chain resilience platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "infrastructure"
+  ],
+  "scripts": {
+    "frontend:dev": "npm run dev --workspace=frontend",
+    "frontend:build": "npm run build --workspace=frontend",
+    "frontend:test": "npm test --workspace=frontend",
+    "frontend:lint": "npm run lint --workspace=frontend",
+    "infrastructure:build": "npm run build --workspace=infrastructure",
+    "infrastructure:test": "npm test --workspace=infrastructure",
+    "infrastructure:synth": "npm run cdk synth --workspace=infrastructure",
+    "infrastructure:deploy": "npm run cdk deploy --workspace=infrastructure",
+    "test:all": "npm test --workspaces",
+    "lint:all": "npm run lint --workspaces",
+    "format:all": "npm run format --workspaces",
+    "install:all": "npm install --workspaces"
+  },
+  "keywords": [
+    "supply-chain",
+    "ai",
+    "aws",
+    "resilience",
+    "nextjs",
+    "cdk"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
