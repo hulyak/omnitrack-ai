@@ -1,0 +1,282 @@
+{
+  "Comment": "Multi-Agent Negotiation Orchestration State Machine",
+  "StartAt": "ValidateInput",
+  "States": {
+    "ValidateInput": {
+      "Type": "Pass",
+      "Comment": "Validate input parameters",
+      "Next": "ParallelAgentExecution"
+    },
+    "ParallelAgentExecution": {
+      "Type": "Parallel",
+      "Comment": "Execute Info, Scenario, Impact, and Strategy agents in parallel",
+      "Branches": [
+        {
+          "StartAt": "InvokeInfoAgent",
+          "States": {
+            "InvokeInfoAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${InfoAgentFunctionArn}",
+                "Payload": {
+                  "body.$": "$.infoAgentInput"
+                }
+              },
+              "ResultPath": "$.infoAgentResult",
+              "End": true,
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.infoAgentError",
+                  "Next": "InfoAgentFailed"
+                }
+              ]
+            },
+            "InfoAgentFailed": {
+              "Type": "Pass",
+              "Result": {
+                "status": "failed",
+                "agent": "InfoAgent"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "InvokeScenarioAgent",
+          "States": {
+            "InvokeScenarioAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${ScenarioAgentFunctionArn}",
+                "Payload": {
+                  "body.$": "$.scenarioAgentInput"
+                }
+              },
+              "ResultPath": "$.scenarioAgentResult",
+              "End": true,
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.scenarioAgentError",
+                  "Next": "ScenarioAgentFailed"
+                }
+              ]
+            },
+            "ScenarioAgentFailed": {
+              "Type": "Pass",
+              "Result": {
+                "status": "failed",
+                "agent": "ScenarioAgent"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "InvokeImpactAgent",
+          "States": {
+            "InvokeImpactAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${ImpactAgentFunctionArn}",
+                "Payload": {
+                  "body.$": "$.impactAgentInput"
+                }
+              },
+              "ResultPath": "$.impactAgentResult",
+              "End": true,
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.impactAgentError",
+                  "Next": "ImpactAgentFailed"
+                }
+              ]
+            },
+            "ImpactAgentFailed": {
+              "Type": "Pass",
+              "Result": {
+                "status": "failed",
+                "agent": "ImpactAgent"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "InvokeStrategyAgent",
+          "States": {
+            "InvokeStrategyAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${StrategyAgentFunctionArn}",
+                "Payload": {
+                  "body.$": "$.strategyAgentInput"
+                }
+              },
+              "ResultPath": "$.strategyAgentResult",
+              "End": true,
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.strategyAgentError",
+                  "Next": "StrategyAgentFailed"
+                }
+              ]
+            },
+            "StrategyAgentFailed": {
+              "Type": "Pass",
+              "Result": {
+                "status": "failed",
+                "agent": "StrategyAgent"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.parallelResults",
+      "Next": "AggregateResults"
+    },
+    "AggregateResults": {
+      "Type": "Pass",
+      "Comment": "Aggregate results from parallel agent execution",
+      "Parameters": {
+        "scenarioId.$": "$.scenarioId",
+        "userId.$": "$.userId",
+        "impacts.$": "$.parallelResults[2].impactAgentResult.Payload.impacts",
+        "strategies.$": "$.parallelResults[3].strategyAgentResult.Payload.strategies",
+        "userPreferences.$": "$.userPreferences",
+        "correlationId.$": "$.correlationId"
+      },
+      "ResultPath": "$.negotiationInput",
+      "Next": "ExecuteNegotiation"
+    },
+    "ExecuteNegotiation": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Comment": "Execute cross-agent negotiation",
+      "Parameters": {
+        "FunctionName": "${NegotiationOrchestratorFunctionArn}",
+        "Payload": {
+          "body.$": "States.JsonToString($.negotiationInput)"
+        }
+      },
+      "ResultPath": "$.negotiationResult",
+      "Next": "CheckForConflicts",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.negotiationError",
+          "Next": "NegotiationFailed"
+        }
+      ]
+    },
+    "CheckForConflicts": {
+      "Type": "Choice",
+      "Comment": "Check if negotiation resulted in conflicts",
+      "Choices": [
+        {
+          "Variable": "$.negotiationResult.Payload.result.conflictEscalation",
+          "IsPresent": true,
+          "Next": "EscalateConflict"
+        }
+      ],
+      "Default": "LogDecision"
+    },
+    "EscalateConflict": {
+      "Type": "Pass",
+      "Comment": "Escalate conflict to user for resolution",
+      "Parameters": {
+        "status": "conflict_escalated",
+        "conflictEscalation.$": "$.negotiationResult.Payload.result.conflictEscalation",
+        "balancedStrategies.$": "$.negotiationResult.Payload.result.balancedStrategies",
+        "tradeoffVisualizations.$": "$.negotiationResult.Payload.result.tradeoffVisualizations"
+      },
+      "ResultPath": "$.finalResult",
+      "Next": "LogDecision"
+    },
+    "LogDecision": {
+      "Type": "Pass",
+      "Comment": "Decision rationale already logged by negotiation orchestrator",
+      "Parameters": {
+        "status": "completed",
+        "result.$": "$.negotiationResult.Payload.result",
+        "metadata.$": "$.negotiationResult.Payload.metadata"
+      },
+      "ResultPath": "$.output",
+      "End": true
+    },
+    "NegotiationFailed": {
+      "Type": "Fail",
+      "Comment": "Negotiation execution failed",
+      "Error": "NegotiationExecutionError",
+      "Cause": "Failed to execute cross-agent negotiation"
+    }
+  }
+}
