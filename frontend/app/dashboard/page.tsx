@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Lightbulb, FlaskConical } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { AgentControls } from '@/components/dashboard/agent-controls';
 import { SupplyChainNetwork } from '@/components/dashboard/supply-chain-network';
 import { AgentResults } from '@/components/dashboard/agent-results';
@@ -156,24 +156,7 @@ function DashboardContent() {
               </p>
             </div>
             
-            {/* Quick Action Buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => router.push('/scenarios')}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-blue-500/50 hover:scale-105"
-              >
-                <FlaskConical className="h-5 w-5" />
-                <span className="font-medium">Run Scenarios</span>
-              </button>
-              
-              <button
-                onClick={() => router.push('/explainability')}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-purple-500/50 hover:scale-105"
-              >
-                <Lightbulb className="h-5 w-5" />
-                <span className="font-medium">AI Explainability</span>
-              </button>
-            </div>
+
           </div>
         </div>
 
