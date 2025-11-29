@@ -256,7 +256,7 @@ export function CopilotChat({ isOpen, onClose, supplyChainContext }: CopilotChat
         <div className="flex items-center gap-2">
           {/* Connection status indicator */}
           {demoMode ? (
-            <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" title="Demo Mode" />
+            <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" aria-label="Demo Mode" />
           ) : isConnecting ? (
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="Connecting..." />
           ) : isConnected ? (
