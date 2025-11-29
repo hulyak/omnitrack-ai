@@ -51,3 +51,6 @@ cdk.out/
 # AWS
 .aws-sam/
 samconfig.toml
+
+# Archived development files
+.archive/
