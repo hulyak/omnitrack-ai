@@ -2,6 +2,8 @@
 
 ## High-Level Architecture for Hackathon Demo
 
+**Status**: Deployment-ready infrastructure validated with AWS CDK. Currently running locally for demonstration, but all AWS services are defined and ready for one-command deployment (`cdk deploy`).
+
 ```mermaid
 graph TB
     subgraph "Frontend Layer"

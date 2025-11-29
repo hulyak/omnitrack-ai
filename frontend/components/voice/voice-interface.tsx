@@ -181,6 +181,7 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
         },
         audioResponse: response.response.text,
         visualData: response.data,
+        requiresClarification: false,
         executionStatus: response.success ? 'success' : 'failed',
         executionTime: response.executionTime,
       };
