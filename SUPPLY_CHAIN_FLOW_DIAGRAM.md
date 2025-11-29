@@ -1,0 +1,260 @@
+# Supply Chain Configuration Flow
+
+## Visual Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER DASHBOARD                          │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │         Supply Chain Configuration Form                   │ │
+│  │                                                           │ │
+│  │  Region:          [Asia-Pacific ▼]                       │ │
+│  │  Industry:        [Electronics ▼]                        │ │
+│  │  Currency:        [USD ▼]                                │ │
+│  │  Shipping:        ☑ Sea  ☑ Air  ☐ Rail                  │ │
+│  │  Nodes:           [====●====] 6                          │ │
+│  │  Risk:            ○ Low  ● Medium  ○ High               │ │
+│  │                                                           │ │
+│  │              [Apply Configuration]                        │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                              ↓                                  │
+└──────────────────────────────┼──────────────────────────────────┘
+                               ↓
+                    POST /api/supply-chain/config
+                               ↓
+┌──────────────────────────────┼──────────────────────────────────┐
+│                    DEMO DATA STORE                              │
+│                                                                 │
+│  setConfig(config) {                                           │
+│    this.config = config;                                       │
+│    this.nodes.clear();                                         │
+│    this.initializeNodes();  ──────────┐                       │
+│    this.notifySubscribers();          │                       │
+│  }                                     │                       │
+│                                        ↓                       │
+│  generateNodesByConfig() {                                     │
+│    ┌─────────────────────────────────────────────┐           │
+│    │ 1. Select locations based on region         │           │
+│    │    - Asia-Pacific: Shanghai, Singapore...   │           │
+│    │    - North America: LA, New York...         │           │
+│    │    - Europe: London, Hamburg...             │           │
+│    └─────────────────────────────────────────────┘           │
+│                        ↓                                       │
+│    ┌─────────────────────────────────────────────┐           │
+│    │ 2. Distribute node types                    │           │
+│    │    - Suppliers (2)                          │           │
+│    │    - Manufacturers (1)                      │           │
+│    │    - Warehouses (1)                         │           │
+│    │    - Distributors (1)                       │           │
+│    │    - Retailers (1)                          │           │
+│    └─────────────────────────────────────────────┘           │
+│                        ↓                                       │
+│    ┌─────────────────────────────────────────────┐           │
+│    │ 3. Apply risk profile                       │           │
+│    │    - Low: 90% healthy nodes                 │           │
+│    │    - Medium: 70% healthy nodes              │           │
+│    │    - High: 40% healthy nodes                │           │
+│    └─────────────────────────────────────────────┘           │
+│                        ↓                                       │
+│    ┌─────────────────────────────────────────────┐           │
+│    │ 4. Generate node details                    │           │
+│    │    - Supplier: contacts, certifications     │           │
+│    │    - Manufacturer: capacity, workforce      │           │
+│    │    - Warehouse: storage, temperature        │           │
+│    │    - Distributor: fleet, coverage           │           │
+│    │    - Retailer: stores, channels             │           │
+│    └─────────────────────────────────────────────┘           │
+│                        ↓                                       │
+│    return nodes[];                                             │
+│  }                                                             │
+│                                                                 │
+│  Nodes stored in Map<string, SupplyChainNode>                 │
+└─────────────────────────────────────────────────────────────────┘
+                               ↓
+┌──────────────────────────────┼──────────────────────────────────┐
+│                    SUPPLY CHAIN NETWORK                         │
+│                                                                 │
+│     Shanghai          Singapore         Los Angeles            │
+│    [Supplier]────────[Manufacturer]────[Warehouse]             │
+│        │                                    │                   │
+│        │                                    │                   │
+│    Shenzhen                            New York                │
+│    [Supplier]──────────────────────[Distributor]               │
+│                                            │                   │
+│                                            │                   │
+│                                         London                 │
+│                                        [Retailer]              │
+│                                                                 │
+│  Status Indicators:                                            │
+│  🟢 Healthy (utilization 50-100%)                             │
+│  🟡 Warning (utilization 30-50%)                              │
+│  🔴 Critical (utilization 0-30%)                              │
+└─────────────────────────────────────────────────────────────────┘
+                               ↓
+┌──────────────────────────────┼──────────────────────────────────┐
+│                      AI AGENT CONTROLS                          │
+│                                                                 │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  │
+│  │  Info Agent    │  │ Scenario Agent │  │ Strategy Agent │  │
+│  │  🔍 Scan       │  │  🎯 Simulate   │  │  🛡️ Generate  │  │
+│  └────────────────┘  └────────────────┘  └────────────────┘  │
+│                                                                 │
+│  ┌────────────────┐                                            │
+│  │ Impact Agent   │                                            │
+│  │  🌱 Calculate  │                                            │
+│  └────────────────┘                                            │
+└─────────────────────────────────────────────────────────────────┘
+                               ↓
+                    POST /api/agents/{agent}
+                               ↓
+┌──────────────────────────────┼──────────────────────────────────┐
+│                        AI AGENT LOGIC                           │
+│                                                                 │
+│  const nodes = dataStore.getNodes();                           │
+│  const config = dataStore.getConfig();                         │
+│                                                                 │
+│  ┌─────────────────────────────────────────────┐              │
+│  │ INFO AGENT                                  │              │
+│  │ - Scan nodes for anomalies                  │              │
+│  │ - Filter by status (warning/critical)       │              │
+│  │ - Generate recommendations                  │              │
+│  │ - Return summary with counts                │              │
+│  └─────────────────────────────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────┐              │
+│  │ SCENARIO AGENT                              │              │
+│  │ - Calculate impact based on:                │              │
+│  │   * Current utilization                     │              │
+│  │   * Shipping methods available              │              │
+│  │   * Risk profile                            │              │
+│  │ - Adjust costs by currency                  │              │
+│  │ - Provide context-aware recommendations     │              │
+│  └─────────────────────────────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────┐              │
+│  │ STRATEGY AGENT                              │              │
+│  │ - Analyze supply chain health               │              │
+│  │ - Generate strategies for issues:           │              │
+│  │   * Multi-sourcing (if suppliers at risk)   │              │
+│  │   * Inventory optimization (if low util)    │              │
+│  │   * Transportation diversification          │              │
+│  │   * Regional risk mitigation                │              │
+│  │ - Provide costs in configured currency      │              │
+│  └─────────────────────────────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────┐              │
+│  │ IMPACT AGENT                                │              │
+│  │ - Calculate ESG metrics:                    │              │
+│  │   * Carbon footprint (shipping methods)     │              │
+│  │   * Energy efficiency (utilization)         │              │
+│  │   * Social metrics (risk profile)           │              │
+│  │   * Governance scores (network health)      │              │
+│  │ - Provide specific recommendations          │              │
+│  └─────────────────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+                               ↓
+┌──────────────────────────────┼──────────────────────────────────┐
+│                       AGENT RESULTS                             │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ Info Agent Results                                        │ │
+│  │                                                           │ │
+│  │ Anomalies Detected: 2                                    │ │
+│  │                                                           │ │
+│  │ 🔴 New York Distribution Hub                             │ │
+│  │    Status: Critical (19% capacity)                       │ │
+│  │    Recommendation: Expedite shipment immediately         │ │
+│  │                                                           │ │
+│  │ 🟡 Shenzhen Electronics Supply                           │ │
+│  │    Status: Warning (45% capacity)                        │ │
+│  │    Recommendation: Review inventory levels               │ │
+│  │                                                           │ │
+│  │ Summary:                                                  │ │
+│  │ - Total Nodes: 6                                         │ │
+│  │ - Healthy: 4                                             │ │
+│  │ - Warning: 1                                             │ │
+│  │ - Critical: 1                                            │ │
+│  │ - Region: Asia-Pacific                                   │ │
+│  │ - Industry: Electronics Manufacturing                    │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow Summary
+
+1. **User Input** → Configuration form
+2. **API Call** → POST /api/supply-chain/config
+3. **Data Store** → Regenerates nodes based on config
+4. **Network Update** → Visual display shows new nodes
+5. **Agent Trigger** → User clicks agent button
+6. **Agent Analysis** → Processes real node data + config
+7. **Results Display** → Context-aware insights shown
+
+## Key Integration Points
+
+### Configuration → Node Generation
+```typescript
+config.region → locations (Shanghai, LA, London...)
+config.industry → node details (supplier contacts, factory capacity...)
+config.riskProfile → node status (healthy, warning, critical)
+config.nodeCount → network size (3-12 nodes)
+```
+
+### Nodes + Config → Agent Intelligence
+```typescript
+nodes.status → anomaly detection
+nodes.metrics → utilization analysis
+config.shippingMethods → ESG calculations
+config.currency → cost estimates
+config.riskProfile → recommendation severity
+```
+
+## Example: Complete Flow
+
+```
+User selects:
+  Region: North America
+  Industry: Automotive
+  Risk: High
+  Nodes: 8
+
+         ↓
+
+System generates:
+  - Los Angeles Supplier (Critical - 25% util)
+  - New York Supplier (Warning - 45% util)
+  - Chicago Manufacturer (Healthy - 75% util)
+  - Toronto Warehouse (Warning - 40% util)
+  - Mexico City Distributor (Critical - 20% util)
+  - LA Distributor (Healthy - 65% util)
+  - NY Retailer (Warning - 48% util)
+  - Chicago Retailer (Healthy - 70% util)
+
+         ↓
+
+User runs Info Agent:
+  Detects: 2 critical, 3 warning nodes
+  Recommends: Expedite to LA & Mexico City
+  Summary: 3 healthy, 3 warning, 2 critical
+
+         ↓
+
+User runs Strategy Agent:
+  Suggests: Multi-sourcing (2 suppliers at risk)
+  Suggests: Inventory optimization (low avg util)
+  Suggests: Regional risk mitigation (high risk)
+  Costs: USD 150,000 - 350,000
+
+         ↓
+
+User runs Impact Agent:
+  Carbon: High (truck-heavy shipping)
+  Social: Adequate (high risk profile)
+  Governance: Strong (good monitoring)
+  Recommends: Add rail to reduce carbon
+```
+
+---
+
+This diagram shows how user configuration flows through the system to generate realistic supply chain data that AI agents can analyze and provide context-aware insights.

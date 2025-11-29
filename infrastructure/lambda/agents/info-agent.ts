@@ -131,7 +131,7 @@ export const handler = async (
     let alerts: any[] | undefined;
     if (request.includeAlerts) {
       logger.info('Fetching active alerts');
-      const { AlertStatus } = await import('../models/types');
+      const { AlertStatus } = await import('../models/types.js');
       const alertResult = await alertRepository.getAlertsByStatus(AlertStatus.ACTIVE);
       alerts = alertResult.items;
       logger.info('Alerts fetched', { count: alerts.length });

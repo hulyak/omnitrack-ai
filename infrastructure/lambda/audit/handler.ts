@@ -4,7 +4,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { withAuth, AuthenticatedUser } from '../auth/middleware';
-import { hasPermission } from '../auth/rbac';
+import { hasPermission, Permission } from '../auth/rbac';
 import {
   queryAuditLogs,
   getVersionHistory,
@@ -21,7 +21,7 @@ async function queryAuditLogsHandler(
 ): Promise<APIGatewayProxyResult> {
   try {
     // Check permissions - only admins and security officers can query audit logs
-    if (!hasPermission(user, 'audit:read')) {
+    if (!hasPermission(user, Permission.VIEW_AUDIT_LOGS)) {
       return {
         statusCode: 403,
         headers: {
@@ -114,7 +114,7 @@ async function getVersionHistoryHandler(
 ): Promise<APIGatewayProxyResult> {
   try {
     // Check permissions
-    if (!hasPermission(user, 'audit:read')) {
+    if (!hasPermission(user, Permission.VIEW_AUDIT_LOGS)) {
       return {
         statusCode: 403,
         headers: {

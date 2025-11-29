@@ -1,0 +1,2339 @@
+import * as cdk from 'aws-cdk-lib/core';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as logs from 'aws-cdk-lib/aws-logs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as iot from 'aws-cdk-lib/aws-iot';
+import * as elasticache from 'aws-cdk-lib/aws-elasticache';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as kms from 'aws-cdk-lib/aws-kms';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import { Construct } from 'constructs';
+import * as path from 'path';
+
+export class InfrastructureStack extends cdk.Stack {
+  public readonly vpc: ec2.Vpc;
+  public readonly mainTable: dynamodb.Table;
+  public readonly userPool: cognito.UserPool;
+  public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly restApi: apigateway.RestApi;
+  public readonly webSocketApi: apigatewayv2.CfnApi;
+  public readonly digitalTwinBucket: s3.Bucket;
+  public readonly modelArtifactsBucket: s3.Bucket;
+  public readonly iotProcessorFunction: lambdaNodejs.NodejsFunction;
+  public readonly redisCluster: elasticache.CfnCacheCluster;
+  public readonly redisSecurityGroup: ec2.SecurityGroup;
+  public readonly lambdaSecurityGroup: ec2.SecurityGroup;
+  public readonly kmsKey: kms.Key;
+  public readonly secretsManagerSecret: secretsmanager.Secret;
+  public readonly webAcl: wafv2.CfnWebACL;
+
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    // ========================================
+    // VPC with public/private subnets across 3 AZs
+    // ========================================
+    this.vpc = new ec2.Vpc(this, 'OmniTrackVPC', {
+      maxAzs: 3,
+      natGateways: 3,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: 'Public',
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+        {
+          cidrMask: 24,
+          name: 'Private',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+      ],
+      enableDnsHostnames: true,
+      enableDnsSupport: true,
+    });
+
+    // Add VPC Flow Logs for security monitoring
+    const flowLogRole = new iam.Role(this, 'VPCFlowLogRole', {
+      assumedBy: new iam.ServicePrincipal('vpc-flow-logs.amazonaws.com'),
+    });
+
+    const flowLogGroup = new logs.LogGroup(this, 'VPCFlowLogGroup', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    new ec2.CfnFlowLog(this, 'VPCFlowLog', {
+      resourceId: this.vpc.vpcId,
+      resourceType: 'VPC',
+      trafficType: 'ALL',
+      logDestinationType: 'cloud-watch-logs',
+      logGroupName: flowLogGroup.logGroupName,
+      deliverLogsPermissionArn: flowLogRole.roleArn,
+    });
+
+    // ========================================
+    // KMS Key for Encryption
+    // ========================================
+    this.kmsKey = new kms.Key(this, 'OmniTrackKMSKey', {
+      description: 'KMS key for OmniTrack sensitive data encryption',
+      enableKeyRotation: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      alias: 'omnitrack/main',
+      policy: new iam.PolicyDocument({
+        statements: [
+          new iam.PolicyStatement({
+            sid: 'Enable IAM User Permissions',
+            effect: iam.Effect.ALLOW,
+            principals: [new iam.AccountRootPrincipal()],
+            actions: ['kms:*'],
+            resources: ['*'],
+          }),
+          new iam.PolicyStatement({
+            sid: 'Allow services to use the key',
+            effect: iam.Effect.ALLOW,
+            principals: [
+              new iam.ServicePrincipal('dynamodb.amazonaws.com'),
+              new iam.ServicePrincipal('s3.amazonaws.com'),
+              new iam.ServicePrincipal('secretsmanager.amazonaws.com'),
+              new iam.ServicePrincipal('logs.amazonaws.com'),
+            ],
+            actions: [
+              'kms:Decrypt',
+              'kms:Encrypt',
+              'kms:ReEncrypt*',
+              'kms:GenerateDataKey*',
+              'kms:CreateGrant',
+              'kms:DescribeKey',
+            ],
+            resources: ['*'],
+            conditions: {
+              StringEquals: {
+                'kms:ViaService': [
+                  `dynamodb.${cdk.Aws.REGION}.amazonaws.com`,
+                  `s3.${cdk.Aws.REGION}.amazonaws.com`,
+                  `secretsmanager.${cdk.Aws.REGION}.amazonaws.com`,
+                  `logs.${cdk.Aws.REGION}.amazonaws.com`,
+                ],
+              },
+            },
+          }),
+        ],
+      }),
+    });
+
+    // ========================================
+    // Secrets Manager for API Keys and Credentials
+    // ========================================
+    this.secretsManagerSecret = new secretsmanager.Secret(this, 'OmniTrackSecrets', {
+      secretName: 'omnitrack/api-keys',
+      description: 'API keys and credentials for OmniTrack integrations',
+      encryptionKey: this.kmsKey,
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          bedrockApiKey: 'placeholder',
+          slackWebhookUrl: 'placeholder',
+          teamsWebhookUrl: 'placeholder',
+          externalApiKey: 'placeholder',
+        }),
+        generateStringKey: 'apiSecret',
+        excludePunctuation: true,
+        passwordLength: 32,
+      },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // ========================================
+    // AWS WAF Web ACL for API Gateway Protection
+    // ========================================
+    this.webAcl = new wafv2.CfnWebACL(this, 'OmniTrackWebACL', {
+      name: 'omnitrack-api-protection',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      description: 'WAF rules for OmniTrack API Gateway protection',
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: 'OmniTrackWAF',
+      },
+      rules: [
+        // Rate limiting rule - 2000 requests per 5 minutes per IP
+        {
+          name: 'RateLimitRule',
+          priority: 1,
+          statement: {
+            rateBasedStatement: {
+              limit: 2000,
+              aggregateKeyType: 'IP',
+            },
+          },
+          action: {
+            block: {
+              customResponse: {
+                responseCode: 429,
+                customResponseBodyKey: 'RateLimitExceeded',
+              },
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'RateLimitRule',
+          },
+        },
+        // AWS Managed Rules - Common Rule Set
+        {
+          name: 'AWSManagedRulesCommonRuleSet',
+          priority: 2,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+              excludedRules: [],
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesCommonRuleSet',
+          },
+        },
+        // AWS Managed Rules - Known Bad Inputs
+        {
+          name: 'AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 3,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+              excludedRules: [],
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesKnownBadInputsRuleSet',
+          },
+        },
+        // AWS Managed Rules - SQL Injection
+        {
+          name: 'AWSManagedRulesSQLiRuleSet',
+          priority: 4,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesSQLiRuleSet',
+              excludedRules: [],
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesSQLiRuleSet',
+          },
+        },
+        // Block requests with missing or invalid User-Agent
+        {
+          name: 'BlockInvalidUserAgent',
+          priority: 5,
+          statement: {
+            notStatement: {
+              statement: {
+                byteMatchStatement: {
+                  searchString: 'Mozilla',
+                  fieldToMatch: {
+                    singleHeader: { name: 'user-agent' },
+                  },
+                  textTransformations: [
+                    {
+                      priority: 0,
+                      type: 'NONE',
+                    },
+                  ],
+                  positionalConstraint: 'CONTAINS',
+                },
+              },
+            },
+          },
+          action: {
+            block: {
+              customResponse: {
+                responseCode: 403,
+                customResponseBodyKey: 'InvalidUserAgent',
+              },
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'BlockInvalidUserAgent',
+          },
+        },
+        // Geographic restriction (example - block specific countries if needed)
+        {
+          name: 'GeoBlockRule',
+          priority: 6,
+          statement: {
+            geoMatchStatement: {
+              countryCodes: ['CN', 'RU', 'KP'], // Example: Block China, Russia, North Korea
+            },
+          },
+          action: {
+            block: {
+              customResponse: {
+                responseCode: 403,
+                customResponseBodyKey: 'GeoBlocked',
+              },
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'GeoBlockRule',
+          },
+        },
+      ],
+      customResponseBodies: {
+        RateLimitExceeded: {
+          contentType: 'APPLICATION_JSON',
+          content: JSON.stringify({
+            error: 'Rate limit exceeded',
+            message: 'Too many requests. Please try again later.',
+          }),
+        },
+        InvalidUserAgent: {
+          contentType: 'APPLICATION_JSON',
+          content: JSON.stringify({
+            error: 'Invalid request',
+            message: 'Invalid or missing User-Agent header.',
+          }),
+        },
+        GeoBlocked: {
+          contentType: 'APPLICATION_JSON',
+          content: JSON.stringify({
+            error: 'Access denied',
+            message: 'Access from your location is not permitted.',
+          }),
+        },
+      },
+    });
+
+    // ========================================
+    // DynamoDB Table with single-table design and GSIs
+    // ========================================
+    this.mainTable = new dynamodb.Table(this, 'OmniTrackMainTable', {
+      tableName: 'omnitrack-main',
+      partitionKey: {
+        name: 'PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+    });
+
+    // ========================================
+    // AI Copilot DynamoDB Tables
+    // ========================================
+    
+    // Copilot Conversations Table
+    const copilotConversationsTable = new dynamodb.Table(this, 'CopilotConversationsTable', {
+      tableName: 'omnitrack-copilot-conversations',
+      partitionKey: {
+        name: 'conversationId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl', // Auto-delete old conversations after 30 days
+    });
+
+    // GSI for querying conversations by user
+    copilotConversationsTable.addGlobalSecondaryIndex({
+      indexName: 'UserIdIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Copilot Connections Table (for WebSocket connection management)
+    const copilotConnectionsTable = new dynamodb.Table(this, 'CopilotConnectionsTable', {
+      tableName: 'omnitrack-copilot-connections',
+      partitionKey: {
+        name: 'connectionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'ttl', // Auto-cleanup stale connections
+    });
+
+    // GSI for querying connections by user
+    copilotConnectionsTable.addGlobalSecondaryIndex({
+      indexName: 'UserIdIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Copilot Analytics Table (for usage analytics and insights)
+    const copilotAnalyticsTable = new dynamodb.Table(this, 'CopilotAnalyticsTable', {
+      tableName: 'omnitrack-copilot-analytics',
+      partitionKey: {
+        name: 'PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl', // Auto-delete old analytics data after 90 days
+    });
+
+    // GSI for querying analytics by date
+    copilotAnalyticsTable.addGlobalSecondaryIndex({
+      indexName: 'DateIndex',
+      partitionKey: {
+        name: 'date',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for querying analytics by event type
+    copilotAnalyticsTable.addGlobalSecondaryIndex({
+      indexName: 'EventTypeIndex',
+      partitionKey: {
+        name: 'eventType',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI1: For querying by type and timestamp
+    this.mainTable.addGlobalSecondaryIndex({
+      indexName: 'GSI1',
+      partitionKey: {
+        name: 'GSI1PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'GSI1SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI2: For querying by status and priority
+    this.mainTable.addGlobalSecondaryIndex({
+      indexName: 'GSI2',
+      partitionKey: {
+        name: 'GSI2PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'GSI2SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // ========================================
+    // Amazon Cognito User Pool for authentication
+    // ========================================
+    this.userPool = new cognito.UserPool(this, 'OmniTrackUserPool', {
+      userPoolName: 'omnitrack-users',
+      selfSignUpEnabled: true,
+      signInAliases: {
+        email: true,
+        username: true,
+      },
+      autoVerify: {
+        email: true,
+      },
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+        fullname: {
+          required: true,
+          mutable: true,
+        },
+      },
+      customAttributes: {
+        role: new cognito.StringAttribute({ mutable: true }),
+        organization: new cognito.StringAttribute({ mutable: true }),
+      },
+      passwordPolicy: {
+        minLength: 12,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+        tempPasswordValidity: cdk.Duration.days(3),
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      mfa: cognito.Mfa.OPTIONAL,
+      mfaSecondFactor: {
+        sms: true,
+        otp: true,
+      },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // User Pool Client
+    this.userPoolClient = this.userPool.addClient('OmniTrackWebClient', {
+      userPoolClientName: 'omnitrack-web-client',
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+        custom: true,
+      },
+      generateSecret: false,
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
+      preventUserExistenceErrors: true,
+      enableTokenRevocation: true,
+    });
+
+    // ========================================
+    // API Gateway REST API
+    // ========================================
+    const apiLogGroup = new logs.LogGroup(this, 'ApiGatewayAccessLogs', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    this.restApi = new apigateway.RestApi(this, 'OmniTrackRestApi', {
+      restApiName: 'omnitrack-api',
+      description: 'OmniTrack AI Supply Chain REST API',
+      deployOptions: {
+        stageName: 'prod',
+        tracingEnabled: true,
+        dataTraceEnabled: true,
+        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        accessLogDestination: new apigateway.LogGroupLogDestination(apiLogGroup),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+          caller: true,
+          httpMethod: true,
+          ip: true,
+          protocol: true,
+          requestTime: true,
+          resourcePath: true,
+          responseLength: true,
+          status: true,
+          user: true,
+        }),
+        metricsEnabled: true,
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [
+          'Content-Type',
+          'X-Amz-Date',
+          'Authorization',
+          'X-Api-Key',
+          'X-Amz-Security-Token',
+        ],
+        allowCredentials: true,
+      },
+      cloudWatchRole: true,
+    });
+
+    // Associate WAF Web ACL with API Gateway
+    new wafv2.CfnWebACLAssociation(this, 'ApiGatewayWAFAssociation', {
+      resourceArn: `arn:aws:apigateway:${cdk.Aws.REGION}::/restapis/${this.restApi.restApiId}/stages/prod`,
+      webAclArn: this.webAcl.attrArn,
+    });
+
+    // ========================================
+    // Security Groups (created early for Lambda functions)
+    // ========================================
+    
+    // Create security group for Redis cluster with least-privilege rules
+    this.redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
+      vpc: this.vpc,
+      description: 'Security group for ElastiCache Redis cluster - least privilege',
+      allowAllOutbound: false, // Disable all outbound by default
+    });
+
+    // Create security group for Lambda functions
+    this.lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
+      vpc: this.vpc,
+      description: 'Security group for Lambda functions',
+      allowAllOutbound: true, // Lambda needs outbound for AWS services
+    });
+
+    // Allow inbound Redis traffic ONLY from Lambda security group (least privilege)
+    this.redisSecurityGroup.addIngressRule(
+      this.lambdaSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis traffic from Lambda functions only'
+    );
+
+    // Allow Lambda to connect to Redis
+    this.lambdaSecurityGroup.addEgressRule(
+      this.redisSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Lambda to connect to Redis'
+    );
+
+    // ========================================
+    // Lambda Functions for Authentication
+    // ========================================
+
+    // Common Lambda execution role
+    const lambdaExecutionRole = new iam.Role(this, 'LambdaExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+      ],
+    });
+
+    // Grant DynamoDB permissions
+    this.mainTable.grantReadWriteData(lambdaExecutionRole);
+
+    // Grant Cognito permissions
+    lambdaExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'cognito-idp:SignUp',
+          'cognito-idp:InitiateAuth',
+          'cognito-idp:GlobalSignOut',
+          'cognito-idp:GetUser',
+          'cognito-idp:AdminAddUserToGroup',
+        ],
+        resources: [this.userPool.userPoolArn],
+      })
+    );
+
+    // Grant Secrets Manager permissions
+    this.secretsManagerSecret.grantRead(lambdaExecutionRole);
+
+    // Grant KMS permissions
+    this.kmsKey.grantDecrypt(lambdaExecutionRole);
+
+    // ========================================
+    // AI Copilot Lambda Execution Role with Bedrock Access
+    // ========================================
+    const copilotExecutionRole = new iam.Role(this, 'CopilotExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+      ],
+    });
+
+    // Grant DynamoDB permissions for copilot tables
+    copilotConversationsTable.grantReadWriteData(copilotExecutionRole);
+    copilotConnectionsTable.grantReadWriteData(copilotExecutionRole);
+    copilotAnalyticsTable.grantReadWriteData(copilotExecutionRole);
+    this.mainTable.grantReadWriteData(copilotExecutionRole);
+
+    // Grant Bedrock permissions for Claude 3.5 Sonnet
+    copilotExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
+        ],
+        resources: [
+          `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0`,
+          `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
+        ],
+      })
+    );
+
+    // Grant KMS permissions
+    this.kmsKey.grantDecrypt(copilotExecutionRole);
+
+    // Grant Secrets Manager permissions
+    this.secretsManagerSecret.grantRead(copilotExecutionRole);
+
+    // Common Lambda environment variables (Redis endpoint will be added after cluster creation)
+    const lambdaEnvironment = {
+      USER_POOL_ID: this.userPool.userPoolId,
+      USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+      TABLE_NAME: this.mainTable.tableName,
+      SECRETS_ARN: this.secretsManagerSecret.secretArn,
+      KMS_KEY_ID: this.kmsKey.keyId,
+    };
+
+    // Register Lambda
+    const registerFunction = new lambdaNodejs.NodejsFunction(this, 'RegisterFunction', {
+      functionName: 'omnitrack-auth-register',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/auth/register.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // Login Lambda
+    const loginFunction = new lambdaNodejs.NodejsFunction(this, 'LoginFunction', {
+      functionName: 'omnitrack-auth-login',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/auth/login.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // Logout Lambda
+    const logoutFunction = new lambdaNodejs.NodejsFunction(this, 'LogoutFunction', {
+      functionName: 'omnitrack-auth-logout',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/auth/logout.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // Refresh Token Lambda
+    const refreshFunction = new lambdaNodejs.NodejsFunction(this, 'RefreshFunction', {
+      functionName: 'omnitrack-auth-refresh',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/auth/refresh.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // ========================================
+    // API Gateway Endpoints
+    // ========================================
+
+    // Cognito Authorizer for protected endpoints
+    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(
+      this,
+      'CognitoAuthorizer',
+      {
+        cognitoUserPools: [this.userPool],
+        authorizerName: 'omnitrack-cognito-authorizer',
+      }
+    );
+
+    // Auth endpoints
+    const authResource = this.restApi.root.addResource('auth');
+    
+    authResource.addResource('register').addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(registerFunction),
+      {
+        methodResponses: [{ statusCode: '201' }, { statusCode: '400' }, { statusCode: '409' }, { statusCode: '500' }],
+      }
+    );
+
+    authResource.addResource('login').addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(loginFunction),
+      {
+        methodResponses: [{ statusCode: '200' }, { statusCode: '400' }, { statusCode: '401' }, { statusCode: '500' }],
+      }
+    );
+
+    authResource.addResource('logout').addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(logoutFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        methodResponses: [{ statusCode: '200' }, { statusCode: '401' }, { statusCode: '500' }],
+      }
+    );
+
+    authResource.addResource('refresh').addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(refreshFunction),
+      {
+        methodResponses: [{ statusCode: '200' }, { statusCode: '400' }, { statusCode: '401' }, { statusCode: '500' }],
+      }
+    );
+
+    // ========================================
+    // API Endpoint Lambda Functions
+    // ========================================
+
+    // Common environment for API handlers
+    const apiEnvironment = {
+      ...lambdaEnvironment,
+      REDIS_HOST: this.redisCluster.attrRedisEndpointAddress,
+      REDIS_PORT: this.redisCluster.attrRedisEndpointPort,
+    };
+
+    // Digital Twin endpoints
+    const digitalTwinResource = this.restApi.root.addResource('digital-twin');
+    
+    const getDigitalTwinStateFunction = new lambdaNodejs.NodejsFunction(this, 'GetDigitalTwinStateFunction', {
+      functionName: 'omnitrack-api-get-digital-twin-state',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getDigitalTwinStateHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    digitalTwinResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(getDigitalTwinStateFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    const nodesResource = digitalTwinResource.addResource('nodes');
+    const nodeResource = nodesResource.addResource('{id}');
+    
+    const getNodeDetailsFunction = new lambdaNodejs.NodejsFunction(this, 'GetNodeDetailsFunction', {
+      functionName: 'omnitrack-api-get-node-details',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getNodeDetailsHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    nodeResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(getNodeDetailsFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    const refreshResource = digitalTwinResource.addResource('refresh');
+    
+    const refreshDigitalTwinFunction = new lambdaNodejs.NodejsFunction(this, 'RefreshDigitalTwinFunction', {
+      functionName: 'omnitrack-api-refresh-digital-twin',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'refreshDigitalTwinHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    refreshResource.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(refreshDigitalTwinFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Scenario endpoints
+    const scenariosResource = this.restApi.root.addResource('scenarios');
+    
+    const simulateResource = scenariosResource.addResource('simulate');
+    
+    const simulateScenarioFunction = new lambdaNodejs.NodejsFunction(this, 'SimulateScenarioFunction', {
+      functionName: 'omnitrack-api-simulate-scenario',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'simulateScenarioHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 1024,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    simulateResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(simulateScenarioFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    const scenarioResource = scenariosResource.addResource('{id}');
+    
+    const getScenarioFunction = new lambdaNodejs.NodejsFunction(this, 'GetScenarioFunction', {
+      functionName: 'omnitrack-api-get-scenario',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getScenarioHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    scenarioResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(getScenarioFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    const resultsResource = scenarioResource.addResource('results');
+    
+    const getScenarioResultsFunction = new lambdaNodejs.NodejsFunction(this, 'GetScenarioResultsFunction', {
+      functionName: 'omnitrack-api-get-scenario-results',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getScenarioResultsHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    resultsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(getScenarioResultsFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Alert endpoints
+    const alertsResource = this.restApi.root.addResource('alerts');
+    
+    const listAlertsFunction = new lambdaNodejs.NodejsFunction(this, 'ListAlertsFunction', {
+      functionName: 'omnitrack-api-list-alerts',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'listAlertsHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    alertsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(listAlertsFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    const alertResource = alertsResource.addResource('{id}');
+    const acknowledgeResource = alertResource.addResource('acknowledge');
+    
+    const acknowledgeAlertFunction = new lambdaNodejs.NodejsFunction(this, 'AcknowledgeAlertFunction', {
+      functionName: 'omnitrack-api-acknowledge-alert',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'acknowledgeAlertHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    acknowledgeResource.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(acknowledgeAlertFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Marketplace endpoints
+    const marketplaceResource = this.restApi.root.addResource('marketplace');
+    const marketplaceScenariosResource = marketplaceResource.addResource('scenarios');
+    
+    const listMarketplaceScenariosFunction = new lambdaNodejs.NodejsFunction(this, 'ListMarketplaceScenariosFunction', {
+      functionName: 'omnitrack-api-list-marketplace-scenarios',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'listMarketplaceScenariosHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    marketplaceScenariosResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(listMarketplaceScenariosFunction)
+    );
+
+    const publishScenarioFunction = new lambdaNodejs.NodejsFunction(this, 'PublishScenarioFunction', {
+      functionName: 'omnitrack-api-publish-scenario',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'publishScenarioHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    marketplaceScenariosResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(publishScenarioFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Sustainability endpoints
+    const sustainabilityResource = this.restApi.root.addResource('sustainability');
+    
+    const metricsResource = sustainabilityResource.addResource('metrics');
+    
+    const getSustainabilityMetricsFunction = new lambdaNodejs.NodejsFunction(this, 'GetSustainabilityMetricsFunction', {
+      functionName: 'omnitrack-api-get-sustainability-metrics',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getSustainabilityMetricsHandler',
+      entry: path.join(__dirname, '../lambda/api/handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: apiEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      vpc: this.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [this.lambdaSecurityGroup],
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    metricsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(getSustainabilityMetricsFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    new cdk.CfnOutput(this, 'UserPoolArn', {
+      value: this.userPool.userPoolArn,
+      description: 'Cognito User Pool ARN for API Gateway Authorizer',
+      exportName: 'OmniTrack-UserPoolArn',
+    });
+
+    // ========================================
+    // API Gateway WebSocket API
+    // ========================================
+    const webSocketLogGroup = new logs.LogGroup(this, 'WebSocketApiLogs', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    this.webSocketApi = new apigatewayv2.CfnApi(this, 'OmniTrackWebSocketApi', {
+      name: 'omnitrack-websocket-api',
+      protocolType: 'WEBSOCKET',
+      routeSelectionExpression: '$request.body.action',
+      description: 'OmniTrack AI WebSocket API for real-time updates',
+    });
+
+    const webSocketStage = new apigatewayv2.CfnStage(this, 'WebSocketStage', {
+      apiId: this.webSocketApi.ref,
+      stageName: 'prod',
+      autoDeploy: true,
+      defaultRouteSettings: {
+        dataTraceEnabled: true,
+        loggingLevel: 'INFO',
+        throttlingBurstLimit: 5000,
+        throttlingRateLimit: 2000,
+      },
+      accessLogSettings: {
+        destinationArn: webSocketLogGroup.logGroupArn,
+        format: JSON.stringify({
+          requestId: '$context.requestId',
+          ip: '$context.identity.sourceIp',
+          requestTime: '$context.requestTime',
+          routeKey: '$context.routeKey',
+          status: '$context.status',
+        }),
+      },
+    });
+
+    // WebSocket Lambda Functions
+    const wsConnectFunction = new lambdaNodejs.NodejsFunction(this, 'WebSocketConnectFunction', {
+      functionName: 'omnitrack-ws-connect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'connectHandler',
+      entry: path.join(__dirname, '../lambda/api/websocket-handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    const wsDisconnectFunction = new lambdaNodejs.NodejsFunction(this, 'WebSocketDisconnectFunction', {
+      functionName: 'omnitrack-ws-disconnect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'disconnectHandler',
+      entry: path.join(__dirname, '../lambda/api/websocket-handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    const wsDefaultFunction = new lambdaNodejs.NodejsFunction(this, 'WebSocketDefaultFunction', {
+      functionName: 'omnitrack-ws-default',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'defaultHandler',
+      entry: path.join(__dirname, '../lambda/api/websocket-handlers.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: lambdaEnvironment,
+      role: lambdaExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // Grant WebSocket functions permission to manage connections
+    const wsManageConnectionsPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['execute-api:ManageConnections'],
+      resources: [
+        `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${this.webSocketApi.ref}/*`,
+      ],
+    });
+
+    wsConnectFunction.addToRolePolicy(wsManageConnectionsPolicy);
+    wsDisconnectFunction.addToRolePolicy(wsManageConnectionsPolicy);
+    wsDefaultFunction.addToRolePolicy(wsManageConnectionsPolicy);
+
+    // WebSocket Integrations
+    const connectIntegration = new apigatewayv2.CfnIntegration(this, 'ConnectIntegration', {
+      apiId: this.webSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${wsConnectFunction.functionArn}/invocations`,
+    });
+
+    const disconnectIntegration = new apigatewayv2.CfnIntegration(this, 'DisconnectIntegration', {
+      apiId: this.webSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${wsDisconnectFunction.functionArn}/invocations`,
+    });
+
+    const defaultIntegration = new apigatewayv2.CfnIntegration(this, 'DefaultIntegration', {
+      apiId: this.webSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${wsDefaultFunction.functionArn}/invocations`,
+    });
+
+    // WebSocket Routes
+    new apigatewayv2.CfnRoute(this, 'ConnectRoute', {
+      apiId: this.webSocketApi.ref,
+      routeKey: '$connect',
+      authorizationType: 'NONE',
+      target: `integrations/${connectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'DisconnectRoute', {
+      apiId: this.webSocketApi.ref,
+      routeKey: '$disconnect',
+      authorizationType: 'NONE',
+      target: `integrations/${disconnectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'DefaultRoute', {
+      apiId: this.webSocketApi.ref,
+      routeKey: '$default',
+      authorizationType: 'NONE',
+      target: `integrations/${defaultIntegration.ref}`,
+    });
+
+    // Grant API Gateway permission to invoke WebSocket functions
+    wsConnectFunction.addPermission('ApiGatewayInvokeConnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${this.webSocketApi.ref}/*`,
+    });
+
+    wsDisconnectFunction.addPermission('ApiGatewayInvokeDisconnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${this.webSocketApi.ref}/*`,
+    });
+
+    wsDefaultFunction.addPermission('ApiGatewayInvokeDefault', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${this.webSocketApi.ref}/*`,
+    });
+
+    // ========================================
+    // AI Copilot WebSocket API
+    // ========================================
+    const copilotWebSocketLogGroup = new logs.LogGroup(this, 'CopilotWebSocketApiLogs', {
+      logGroupName: '/aws/apigateway/omnitrack-copilot-websocket',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const copilotWebSocketApi = new apigatewayv2.CfnApi(this, 'CopilotWebSocketApi', {
+      name: 'omnitrack-copilot-websocket-api',
+      protocolType: 'WEBSOCKET',
+      routeSelectionExpression: '$request.body.action',
+      description: 'OmniTrack AI Copilot WebSocket API for conversational interface',
+    });
+
+    const copilotWebSocketStage = new apigatewayv2.CfnStage(this, 'CopilotWebSocketStage', {
+      apiId: copilotWebSocketApi.ref,
+      stageName: 'prod',
+      autoDeploy: true,
+      defaultRouteSettings: {
+        dataTraceEnabled: true,
+        loggingLevel: 'INFO',
+        throttlingBurstLimit: 1000,
+        throttlingRateLimit: 500,
+      },
+      accessLogSettings: {
+        destinationArn: copilotWebSocketLogGroup.logGroupArn,
+        format: JSON.stringify({
+          requestId: '$context.requestId',
+          ip: '$context.identity.sourceIp',
+          requestTime: '$context.requestTime',
+          routeKey: '$context.routeKey',
+          status: '$context.status',
+          connectionId: '$context.connectionId',
+        }),
+      },
+    });
+
+    // Copilot Lambda environment variables
+    const copilotEnvironment = {
+      USER_POOL_ID: this.userPool.userPoolId,
+      USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+      TABLE_NAME: this.mainTable.tableName,
+      CONVERSATIONS_TABLE_NAME: copilotConversationsTable.tableName,
+      CONNECTIONS_TABLE_NAME: copilotConnectionsTable.tableName,
+      SECRETS_ARN: this.secretsManagerSecret.secretArn,
+      KMS_KEY_ID: this.kmsKey.keyId,
+      BEDROCK_MODEL_ID: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      BEDROCK_REGION: cdk.Aws.REGION,
+      WEBSOCKET_API_ENDPOINT: `https://${copilotWebSocketApi.ref}.execute-api.${cdk.Aws.REGION}.amazonaws.com/prod`,
+    };
+
+    // Copilot WebSocket Connect Handler
+    const copilotConnectFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotConnectFunction', {
+      functionName: 'omnitrack-copilot-connect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'connectHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Copilot WebSocket Disconnect Handler
+    const copilotDisconnectFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotDisconnectFunction', {
+      functionName: 'omnitrack-copilot-disconnect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'disconnectHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Copilot WebSocket Message Handler (main copilot logic)
+    const copilotMessageFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotMessageFunction', {
+      functionName: 'omnitrack-copilot-message',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'messageHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(60), // Longer timeout for Bedrock API calls
+      memorySize: 1024, // More memory for AI processing
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Grant WebSocket management permissions to copilot functions
+    const copilotWsManageConnectionsPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['execute-api:ManageConnections'],
+      resources: [
+        `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+      ],
+    });
+
+    copilotConnectFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+    copilotDisconnectFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+    copilotMessageFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+
+    // Copilot WebSocket Integrations
+    const copilotConnectIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotConnectIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotConnectFunction.functionArn}/invocations`,
+    });
+
+    const copilotDisconnectIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotDisconnectIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotDisconnectFunction.functionArn}/invocations`,
+    });
+
+    const copilotMessageIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotMessageIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotMessageFunction.functionArn}/invocations`,
+    });
+
+    // Copilot WebSocket Routes
+    new apigatewayv2.CfnRoute(this, 'CopilotConnectRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$connect',
+      authorizationType: 'NONE', // Authentication handled in Lambda
+      target: `integrations/${copilotConnectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotDisconnectRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$disconnect',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotDisconnectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotMessageRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: 'message',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotMessageIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotDefaultRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$default',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotMessageIntegration.ref}`,
+    });
+
+    // Grant API Gateway permission to invoke copilot functions
+    copilotConnectFunction.addPermission('CopilotApiGatewayInvokeConnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+    });
+
+    copilotDisconnectFunction.addPermission('CopilotApiGatewayInvokeDisconnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+    });
+
+    copilotMessageFunction.addPermission('CopilotApiGatewayInvokeMessage', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+    });
+
+    // ========================================
+    // S3 Buckets
+    // ========================================
+    
+    // Digital Twin Snapshots Bucket
+    this.digitalTwinBucket = new s3.Bucket(this, 'DigitalTwinSnapshotsBucket', {
+      bucketName: `omnitrack-digital-twin-${cdk.Aws.ACCOUNT_ID}-${cdk.Aws.REGION}`,
+      encryption: s3.BucketEncryption.KMS,
+      encryptionKey: this.kmsKey,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      versioned: true,
+      lifecycleRules: [
+        {
+          id: 'DeleteOldSnapshots',
+          enabled: true,
+          expiration: cdk.Duration.days(90),
+          noncurrentVersionExpiration: cdk.Duration.days(30),
+        },
+      ],
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+      enforceSSL: true,
+      serverAccessLogsPrefix: 'access-logs/',
+    });
+
+    // Model Artifacts Bucket
+    this.modelArtifactsBucket = new s3.Bucket(this, 'ModelArtifactsBucket', {
+      bucketName: `omnitrack-model-artifacts-${cdk.Aws.ACCOUNT_ID}-${cdk.Aws.REGION}`,
+      encryption: s3.BucketEncryption.KMS,
+      encryptionKey: this.kmsKey,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      versioned: true,
+      lifecycleRules: [
+        {
+          id: 'TransitionToIA',
+          enabled: true,
+          transitions: [
+            {
+              storageClass: s3.StorageClass.INFREQUENT_ACCESS,
+              transitionAfter: cdk.Duration.days(30),
+            },
+            {
+              storageClass: s3.StorageClass.GLACIER,
+              transitionAfter: cdk.Duration.days(90),
+            },
+          ],
+        },
+      ],
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+      enforceSSL: true,
+      serverAccessLogsPrefix: 'access-logs/',
+    });
+
+    // ========================================
+    // AWS IoT Core Integration
+    // ========================================
+
+    // IoT Processor Lambda Function
+    const iotExecutionRole = new iam.Role(this, 'IoTProcessorExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+      ],
+    });
+
+    // Grant DynamoDB permissions to IoT processor
+    this.mainTable.grantReadWriteData(iotExecutionRole);
+
+    this.iotProcessorFunction = new lambdaNodejs.NodejsFunction(this, 'IoTProcessorFunction', {
+      functionName: 'omnitrack-iot-processor',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/iot/iot-processor.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        TABLE_NAME: this.mainTable.tableName,
+        CONFLICT_RESOLUTION_STRATEGY: 'latest_timestamp',
+      },
+      role: iotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk'],
+      },
+    });
+
+    // Grant IoT Core permission to invoke the Lambda
+    this.iotProcessorFunction.addPermission('IoTCoreInvokePermission', {
+      principal: new iam.ServicePrincipal('iot.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+      sourceAccount: cdk.Aws.ACCOUNT_ID,
+    });
+
+    // Create IoT Topic Rule to route sensor data to Lambda
+    const iotTopicRule = new iot.CfnTopicRule(this, 'SensorDataTopicRule', {
+      topicRulePayload: {
+        sql: "SELECT * FROM 'omnitrack/sensors/+/data'",
+        description: 'Route sensor data from IoT devices to Lambda processor',
+        actions: [
+          {
+            lambda: {
+              functionArn: this.iotProcessorFunction.functionArn,
+            },
+          },
+        ],
+        errorAction: {
+          cloudwatchLogs: {
+            logGroupName: '/aws/iot/omnitrack/errors',
+            roleArn: new iam.Role(this, 'IoTErrorLoggingRole', {
+              assumedBy: new iam.ServicePrincipal('iot.amazonaws.com'),
+              inlinePolicies: {
+                CloudWatchLogsPolicy: new iam.PolicyDocument({
+                  statements: [
+                    new iam.PolicyStatement({
+                      effect: iam.Effect.ALLOW,
+                      actions: [
+                        'logs:CreateLogGroup',
+                        'logs:CreateLogStream',
+                        'logs:PutLogEvents',
+                      ],
+                      resources: ['*'],
+                    }),
+                  ],
+                }),
+              },
+            }).roleArn,
+          },
+        },
+        awsIotSqlVersion: '2016-03-23',
+      },
+    });
+
+    // Create IoT error log group
+    new logs.LogGroup(this, 'IoTErrorLogGroup', {
+      logGroupName: '/aws/iot/omnitrack/errors',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // ========================================
+    // ElastiCache Redis Cluster for Caching
+    // ========================================
+
+    // Create subnet group for Redis cluster
+    const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
+      description: 'Subnet group for ElastiCache Redis cluster',
+      subnetIds: this.vpc.privateSubnets.map(subnet => subnet.subnetId),
+      cacheSubnetGroupName: 'omnitrack-redis-subnet-group',
+    });
+
+    // Create parameter group for Redis configuration
+    const redisParameterGroup = new elasticache.CfnParameterGroup(this, 'RedisParameterGroup', {
+      cacheParameterGroupFamily: 'redis7',
+      description: 'Parameter group for OmniTrack Redis cluster',
+      properties: {
+        'maxmemory-policy': 'allkeys-lru', // Evict least recently used keys when memory is full
+        'timeout': '300', // Close idle connections after 5 minutes
+      },
+    });
+
+    // Create ElastiCache Redis cluster
+    this.redisCluster = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
+      cacheNodeType: 'cache.t3.micro', // Small instance for development, scale up for production
+      engine: 'redis',
+      engineVersion: '7.0',
+      numCacheNodes: 1, // Single node for development, use replication group for production
+      clusterName: 'omnitrack-redis-cluster',
+      cacheSubnetGroupName: redisSubnetGroup.cacheSubnetGroupName,
+      vpcSecurityGroupIds: [this.redisSecurityGroup.securityGroupId],
+      cacheParameterGroupName: redisParameterGroup.ref,
+      port: 6379,
+      autoMinorVersionUpgrade: true,
+      preferredMaintenanceWindow: 'sun:05:00-sun:06:00', // Sunday 5-6 AM UTC
+      snapshotRetentionLimit: 5, // Keep 5 daily snapshots
+      snapshotWindow: '03:00-04:00', // Daily snapshot at 3-4 AM UTC
+      tags: [
+        {
+          key: 'Name',
+          value: 'OmniTrack Redis Cluster',
+        },
+        {
+          key: 'Environment',
+          value: 'production',
+        },
+      ],
+    });
+
+    // Ensure subnet group is created before cluster
+    this.redisCluster.addDependency(redisSubnetGroup);
+
+    // Update Lambda environment variables with Redis configuration
+    // Note: Lambda functions created before this point will need to be updated
+    // to include Redis configuration if they need caching capabilities
+    const redisEnvironment = {
+      REDIS_HOST: this.redisCluster.attrRedisEndpointAddress,
+      REDIS_PORT: this.redisCluster.attrRedisEndpointPort,
+    };
+
+    // ========================================
+    // CloudWatch Logs and X-Ray Tracing
+    // ========================================
+    
+    // Central application log group
+    const appLogGroup = new logs.LogGroup(this, 'ApplicationLogGroup', {
+      logGroupName: '/aws/omnitrack/application',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Lambda function log group
+    new logs.LogGroup(this, 'LambdaLogGroup', {
+      logGroupName: '/aws/lambda/omnitrack',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Error log group for high-severity errors
+    const errorLogGroup = new logs.LogGroup(this, 'ErrorLogGroup', {
+      logGroupName: '/aws/omnitrack/errors',
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // X-Ray tracing is enabled at the API Gateway level (tracingEnabled: true)
+    // Lambda functions have X-Ray tracing enabled via tracing: lambda.Tracing.ACTIVE
+
+    // ========================================
+    // SNS Topics for Alert Notifications
+    // ========================================
+
+    // Critical alerts topic (for paging on-call engineers)
+    const criticalAlertsTopic = new sns.Topic(this, 'CriticalAlertsTopic', {
+      topicName: 'omnitrack-critical-alerts',
+      displayName: 'OmniTrack Critical Alerts',
+      fifo: false,
+    });
+
+    // Warning alerts topic (for team notifications)
+    const warningAlertsTopic = new sns.Topic(this, 'WarningAlertsTopic', {
+      topicName: 'omnitrack-warning-alerts',
+      displayName: 'OmniTrack Warning Alerts',
+      fifo: false,
+    });
+
+    // Info alerts topic (for general notifications)
+    const infoAlertsTopic = new sns.Topic(this, 'InfoAlertsTopic', {
+      topicName: 'omnitrack-info-alerts',
+      displayName: 'OmniTrack Info Alerts',
+      fifo: false,
+    });
+
+    // Add email subscriptions (can be configured via environment variables)
+    const criticalEmail = process.env.CRITICAL_ALERT_EMAIL || 'oncall@example.com';
+    const teamEmail = process.env.TEAM_ALERT_EMAIL || 'team@example.com';
+
+    criticalAlertsTopic.addSubscription(
+      new snsSubscriptions.EmailSubscription(criticalEmail)
+    );
+
+    warningAlertsTopic.addSubscription(
+      new snsSubscriptions.EmailSubscription(teamEmail)
+    );
+
+    // ========================================
+    // CloudWatch Alarms for Critical Thresholds
+    // ========================================
+
+    // API Gateway 5xx Error Rate Alarm
+    const apiErrorAlarm = new cloudwatch.Alarm(this, 'ApiErrorRateAlarm', {
+      alarmName: 'OmniTrack-API-5xx-Error-Rate',
+      alarmDescription: 'Alert when API Gateway 5xx error rate exceeds 5%',
+      metric: this.restApi.metricServerError({
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 0.05, // 5% error rate
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiErrorAlarm.addAlarmAction(new cloudwatchActions.SnsAction(criticalAlertsTopic));
+
+    // API Gateway Latency Alarm (p95)
+    const apiLatencyAlarm = new cloudwatch.Alarm(this, 'ApiLatencyAlarm', {
+      alarmName: 'OmniTrack-API-High-Latency',
+      alarmDescription: 'Alert when API Gateway p95 latency exceeds 2 seconds',
+      metric: this.restApi.metricLatency({
+        statistic: 'p95',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 2000, // 2 seconds in milliseconds
+      evaluationPeriods: 3,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiLatencyAlarm.addAlarmAction(new cloudwatchActions.SnsAction(warningAlertsTopic));
+
+    // DynamoDB Read Throttle Alarm
+    const dynamoReadThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoReadThrottleAlarm', {
+      alarmName: 'OmniTrack-DynamoDB-Read-Throttle',
+      alarmDescription: 'Alert when DynamoDB read requests are throttled',
+      metric: this.mainTable.metricUserErrors({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 10,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    dynamoReadThrottleAlarm.addAlarmAction(new cloudwatchActions.SnsAction(warningAlertsTopic));
+
+    // Lambda Error Rate Alarm (for IoT Processor as example)
+    const lambdaErrorAlarm = new cloudwatch.Alarm(this, 'LambdaErrorRateAlarm', {
+      alarmName: 'OmniTrack-Lambda-Error-Rate',
+      alarmDescription: 'Alert when Lambda error rate exceeds 5%',
+      metric: this.iotProcessorFunction.metricErrors({
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 0.05,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    lambdaErrorAlarm.addAlarmAction(new cloudwatchActions.SnsAction(criticalAlertsTopic));
+
+    // Lambda Throttle Alarm
+    const lambdaThrottleAlarm = new cloudwatch.Alarm(this, 'LambdaThrottleAlarm', {
+      alarmName: 'OmniTrack-Lambda-Throttle',
+      alarmDescription: 'Alert when Lambda functions are throttled',
+      metric: this.iotProcessorFunction.metricThrottles({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    lambdaThrottleAlarm.addAlarmAction(new cloudwatchActions.SnsAction(warningAlertsTopic));
+
+    // ========================================
+    // CloudWatch Dashboard for Key Metrics
+    // ========================================
+
+    const dashboard = new cloudwatch.Dashboard(this, 'OmniTrackDashboard', {
+      dashboardName: 'OmniTrack-Operations-Dashboard',
+    });
+
+    // API Gateway Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway Request Count',
+        left: [
+          this.restApi.metricCount({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Total Requests',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway Error Rates',
+        left: [
+          this.restApi.metricClientError({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            label: '4xx Errors',
+          }),
+          this.restApi.metricServerError({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            label: '5xx Errors',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway Latency (p50, p95, p99)',
+        left: [
+          this.restApi.metricLatency({
+            statistic: 'p50',
+            period: cdk.Duration.minutes(5),
+            label: 'p50',
+          }),
+          this.restApi.metricLatency({
+            statistic: 'p95',
+            period: cdk.Duration.minutes(5),
+            label: 'p95',
+          }),
+          this.restApi.metricLatency({
+            statistic: 'p99',
+            period: cdk.Duration.minutes(5),
+            label: 'p99',
+          }),
+        ],
+        width: 24,
+        height: 6,
+      })
+    );
+
+    // Lambda Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Invocations',
+        left: [
+          this.iotProcessorFunction.metricInvocations({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'IoT Processor',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors & Throttles',
+        left: [
+          this.iotProcessorFunction.metricErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Errors',
+          }),
+          this.iotProcessorFunction.metricThrottles({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Throttles',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Duration (p50, p95, p99)',
+        left: [
+          this.iotProcessorFunction.metricDuration({
+            statistic: 'p50',
+            period: cdk.Duration.minutes(5),
+            label: 'p50',
+          }),
+          this.iotProcessorFunction.metricDuration({
+            statistic: 'p95',
+            period: cdk.Duration.minutes(5),
+            label: 'p95',
+          }),
+          this.iotProcessorFunction.metricDuration({
+            statistic: 'p99',
+            period: cdk.Duration.minutes(5),
+            label: 'p99',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Concurrent Executions',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/Lambda',
+            metricName: 'ConcurrentExecutions',
+            dimensionsMap: {
+              FunctionName: this.iotProcessorFunction.functionName,
+            },
+            statistic: 'Maximum',
+            period: cdk.Duration.minutes(5),
+            label: 'Concurrent Executions',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // DynamoDB Metrics
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Read/Write Capacity',
+        left: [
+          this.mainTable.metricConsumedReadCapacityUnits({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Read Capacity',
+          }),
+          this.mainTable.metricConsumedWriteCapacityUnits({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Write Capacity',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Throttled Requests',
+        left: [
+          this.mainTable.metricUserErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'User Errors (Throttles)',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Latency (GetItem)',
+        left: [
+          this.mainTable.metricSuccessfulRequestLatency({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            label: 'Avg Latency',
+            dimensionsMap: {
+              Operation: 'GetItem',
+            },
+          }),
+        ],
+        width: 24,
+        height: 6,
+      })
+    );
+
+    // System Health Summary
+    dashboard.addWidgets(
+      new cloudwatch.SingleValueWidget({
+        title: 'API Health - 5xx Error Rate',
+        metrics: [
+          this.restApi.metricServerError({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Lambda Health - Error Rate',
+        metrics: [
+          this.iotProcessorFunction.metricErrors({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'DynamoDB Health - Throttles',
+        metrics: [
+          this.mainTable.metricUserErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      })
+    );
+
+    // ========================================
+    // Stack Outputs
+    // ========================================
+    new cdk.CfnOutput(this, 'VpcId', {
+      value: this.vpc.vpcId,
+      description: 'VPC ID',
+      exportName: 'OmniTrack-VpcId',
+    });
+
+    new cdk.CfnOutput(this, 'DynamoDBTableName', {
+      value: this.mainTable.tableName,
+      description: 'DynamoDB Main Table Name',
+      exportName: 'OmniTrack-TableName',
+    });
+
+    new cdk.CfnOutput(this, 'DynamoDBTableArn', {
+      value: this.mainTable.tableArn,
+      description: 'DynamoDB Main Table ARN',
+      exportName: 'OmniTrack-TableArn',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value: this.userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+      exportName: 'OmniTrack-UserPoolId',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: this.userPoolClient.userPoolClientId,
+      description: 'Cognito User Pool Client ID',
+      exportName: 'OmniTrack-UserPoolClientId',
+    });
+
+    new cdk.CfnOutput(this, 'RestApiUrl', {
+      value: this.restApi.url,
+      description: 'REST API Gateway URL',
+      exportName: 'OmniTrack-RestApiUrl',
+    });
+
+    new cdk.CfnOutput(this, 'RestApiId', {
+      value: this.restApi.restApiId,
+      description: 'REST API Gateway ID',
+      exportName: 'OmniTrack-RestApiId',
+    });
+
+    new cdk.CfnOutput(this, 'WebSocketApiId', {
+      value: this.webSocketApi.ref,
+      description: 'WebSocket API Gateway ID',
+      exportName: 'OmniTrack-WebSocketApiId',
+    });
+
+    new cdk.CfnOutput(this, 'WebSocketApiUrl', {
+      value: `wss://${this.webSocketApi.ref}.execute-api.${cdk.Aws.REGION}.amazonaws.com/prod`,
+      description: 'WebSocket API Gateway URL',
+      exportName: 'OmniTrack-WebSocketApiUrl',
+    });
+
+    new cdk.CfnOutput(this, 'DigitalTwinBucketName', {
+      value: this.digitalTwinBucket.bucketName,
+      description: 'Digital Twin Snapshots S3 Bucket Name',
+      exportName: 'OmniTrack-DigitalTwinBucket',
+    });
+
+    new cdk.CfnOutput(this, 'ModelArtifactsBucketName', {
+      value: this.modelArtifactsBucket.bucketName,
+      description: 'Model Artifacts S3 Bucket Name',
+      exportName: 'OmniTrack-ModelArtifactsBucket',
+    });
+
+    new cdk.CfnOutput(this, 'ApplicationLogGroupName', {
+      value: appLogGroup.logGroupName,
+      description: 'Application CloudWatch Log Group Name',
+      exportName: 'OmniTrack-AppLogGroup',
+    });
+
+    new cdk.CfnOutput(this, 'IoTProcessorFunctionArn', {
+      value: this.iotProcessorFunction.functionArn,
+      description: 'IoT Processor Lambda Function ARN',
+      exportName: 'OmniTrack-IoTProcessorArn',
+    });
+
+    new cdk.CfnOutput(this, 'IoTTopicRuleName', {
+      value: iotTopicRule.ref,
+      description: 'IoT Topic Rule Name for sensor data routing',
+      exportName: 'OmniTrack-IoTTopicRule',
+    });
+
+    new cdk.CfnOutput(this, 'RedisClusterEndpoint', {
+      value: this.redisCluster.attrRedisEndpointAddress,
+      description: 'ElastiCache Redis Cluster Endpoint',
+      exportName: 'OmniTrack-RedisEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'RedisClusterPort', {
+      value: this.redisCluster.attrRedisEndpointPort,
+      description: 'ElastiCache Redis Cluster Port',
+      exportName: 'OmniTrack-RedisPort',
+    });
+
+    new cdk.CfnOutput(this, 'RedisSecurityGroupId', {
+      value: this.redisSecurityGroup.securityGroupId,
+      description: 'Redis Security Group ID',
+      exportName: 'OmniTrack-RedisSecurityGroup',
+    });
+
+    new cdk.CfnOutput(this, 'CriticalAlertsTopicArn', {
+      value: criticalAlertsTopic.topicArn,
+      description: 'SNS Topic ARN for Critical Alerts',
+      exportName: 'OmniTrack-CriticalAlertsTopic',
+    });
+
+    new cdk.CfnOutput(this, 'WarningAlertsTopicArn', {
+      value: warningAlertsTopic.topicArn,
+      description: 'SNS Topic ARN for Warning Alerts',
+      exportName: 'OmniTrack-WarningAlertsTopic',
+    });
+
+    new cdk.CfnOutput(this, 'InfoAlertsTopicArn', {
+      value: infoAlertsTopic.topicArn,
+      description: 'SNS Topic ARN for Info Alerts',
+      exportName: 'OmniTrack-InfoAlertsTopic',
+    });
+
+    new cdk.CfnOutput(this, 'DashboardUrl', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${cdk.Aws.REGION}#dashboards:name=${dashboard.dashboardName}`,
+      description: 'CloudWatch Dashboard URL',
+      exportName: 'OmniTrack-DashboardUrl',
+    });
+
+    new cdk.CfnOutput(this, 'ErrorLogGroupName', {
+      value: errorLogGroup.logGroupName,
+      description: 'Error Log Group Name',
+      exportName: 'OmniTrack-ErrorLogGroup',
+    });
+
+    // Security outputs
+    new cdk.CfnOutput(this, 'KMSKeyId', {
+      value: this.kmsKey.keyId,
+      description: 'KMS Key ID for encryption',
+      exportName: 'OmniTrack-KMSKeyId',
+    });
+
+    new cdk.CfnOutput(this, 'KMSKeyArn', {
+      value: this.kmsKey.keyArn,
+      description: 'KMS Key ARN for encryption',
+      exportName: 'OmniTrack-KMSKeyArn',
+    });
+
+    new cdk.CfnOutput(this, 'SecretsManagerArn', {
+      value: this.secretsManagerSecret.secretArn,
+      description: 'Secrets Manager Secret ARN',
+      exportName: 'OmniTrack-SecretsArn',
+    });
+
+    new cdk.CfnOutput(this, 'WebACLArn', {
+      value: this.webAcl.attrArn,
+      description: 'WAF Web ACL ARN',
+      exportName: 'OmniTrack-WebACLArn',
+    });
+
+    new cdk.CfnOutput(this, 'WebACLId', {
+      value: this.webAcl.attrId,
+      description: 'WAF Web ACL ID',
+      exportName: 'OmniTrack-WebACLId',
+    });
+
+    new cdk.CfnOutput(this, 'LambdaSecurityGroupId', {
+      value: this.lambdaSecurityGroup.securityGroupId,
+      description: 'Lambda Security Group ID',
+      exportName: 'OmniTrack-LambdaSecurityGroup',
+    });
+
+    // AI Copilot outputs
+    new cdk.CfnOutput(this, 'CopilotWebSocketApiId', {
+      value: copilotWebSocketApi.ref,
+      description: 'AI Copilot WebSocket API Gateway ID',
+      exportName: 'OmniTrack-CopilotWebSocketApiId',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotWebSocketApiUrl', {
+      value: `wss://${copilotWebSocketApi.ref}.execute-api.${cdk.Aws.REGION}.amazonaws.com/prod`,
+      description: 'AI Copilot WebSocket API Gateway URL',
+      exportName: 'OmniTrack-CopilotWebSocketApiUrl',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotConversationsTableName', {
+      value: copilotConversationsTable.tableName,
+      description: 'AI Copilot Conversations DynamoDB Table Name',
+      exportName: 'OmniTrack-CopilotConversationsTable',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotConnectionsTableName', {
+      value: copilotConnectionsTable.tableName,
+      description: 'AI Copilot Connections DynamoDB Table Name',
+      exportName: 'OmniTrack-CopilotConnectionsTable',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotMessageFunctionArn', {
+      value: copilotMessageFunction.functionArn,
+      description: 'AI Copilot Message Handler Lambda Function ARN',
+      exportName: 'OmniTrack-CopilotMessageFunctionArn',
+    });
+  }
+}

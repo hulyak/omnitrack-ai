@@ -346,11 +346,125 @@ export class InfrastructureStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
       encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
       encryptionKey: this.kmsKey,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+    });
+
+    // ========================================
+    // AI Copilot DynamoDB Tables
+    // ========================================
+    
+    // Copilot Conversations Table
+    const copilotConversationsTable = new dynamodb.Table(this, 'CopilotConversationsTable', {
+      tableName: 'omnitrack-copilot-conversations',
+      partitionKey: {
+        name: 'conversationId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl', // Auto-delete old conversations after 30 days
+    });
+
+    // GSI for querying conversations by user
+    copilotConversationsTable.addGlobalSecondaryIndex({
+      indexName: 'UserIdIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Copilot Connections Table (for WebSocket connection management)
+    const copilotConnectionsTable = new dynamodb.Table(this, 'CopilotConnectionsTable', {
+      tableName: 'omnitrack-copilot-connections',
+      partitionKey: {
+        name: 'connectionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'ttl', // Auto-cleanup stale connections
+    });
+
+    // GSI for querying connections by user
+    copilotConnectionsTable.addGlobalSecondaryIndex({
+      indexName: 'UserIdIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Copilot Analytics Table (for usage analytics and insights)
+    const copilotAnalyticsTable = new dynamodb.Table(this, 'CopilotAnalyticsTable', {
+      tableName: 'omnitrack-copilot-analytics',
+      partitionKey: {
+        name: 'PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.CUSTOMER_MANAGED,
+      encryptionKey: this.kmsKey,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl', // Auto-delete old analytics data after 90 days
+    });
+
+    // GSI for querying analytics by date
+    copilotAnalyticsTable.addGlobalSecondaryIndex({
+      indexName: 'DateIndex',
+      partitionKey: {
+        name: 'date',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for querying analytics by event type
+    copilotAnalyticsTable.addGlobalSecondaryIndex({
+      indexName: 'EventTypeIndex',
+      partitionKey: {
+        name: 'eventType',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'timestamp',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // GSI1: For querying by type and timestamp
@@ -525,6 +639,57 @@ export class InfrastructureStack extends cdk.Stack {
     );
 
     // ========================================
+    // ElastiCache Redis Cluster for Caching
+    // ========================================
+
+    // Create subnet group for Redis cluster
+    const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
+      description: 'Subnet group for ElastiCache Redis cluster',
+      subnetIds: this.vpc.privateSubnets.map(subnet => subnet.subnetId),
+      cacheSubnetGroupName: 'omnitrack-redis-subnet-group',
+    });
+
+    // Create parameter group for Redis configuration
+    const redisParameterGroup = new elasticache.CfnParameterGroup(this, 'RedisParameterGroup', {
+      cacheParameterGroupFamily: 'redis7',
+      description: 'Parameter group for OmniTrack Redis cluster',
+      properties: {
+        'maxmemory-policy': 'allkeys-lru', // Evict least recently used keys when memory is full
+        'timeout': '300', // Close idle connections after 5 minutes
+      },
+    });
+
+    // Create ElastiCache Redis cluster
+    this.redisCluster = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
+      cacheNodeType: 'cache.t3.micro', // Small instance for development, scale up for production
+      engine: 'redis',
+      engineVersion: '7.0',
+      numCacheNodes: 1, // Single node for development, use replication group for production
+      clusterName: 'omnitrack-redis-cluster',
+      cacheSubnetGroupName: redisSubnetGroup.cacheSubnetGroupName,
+      vpcSecurityGroupIds: [this.redisSecurityGroup.securityGroupId],
+      cacheParameterGroupName: redisParameterGroup.ref,
+      port: 6379,
+      autoMinorVersionUpgrade: true,
+      preferredMaintenanceWindow: 'sun:05:00-sun:06:00', // Sunday 5-6 AM UTC
+      snapshotRetentionLimit: 5, // Keep 5 daily snapshots
+      snapshotWindow: '03:00-04:00', // Daily snapshot at 3-4 AM UTC
+      tags: [
+        {
+          key: 'Name',
+          value: 'OmniTrack Redis Cluster',
+        },
+        {
+          key: 'Environment',
+          value: 'production',
+        },
+      ],
+    });
+
+    // Ensure subnet group is created before cluster
+    this.redisCluster.addDependency(redisSubnetGroup);
+
+    // ========================================
     // Lambda Functions for Authentication
     // ========================================
 
@@ -562,6 +727,44 @@ export class InfrastructureStack extends cdk.Stack {
     // Grant KMS permissions
     this.kmsKey.grantDecrypt(lambdaExecutionRole);
 
+    // ========================================
+    // AI Copilot Lambda Execution Role with Bedrock Access
+    // ========================================
+    const copilotExecutionRole = new iam.Role(this, 'CopilotExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+      ],
+    });
+
+    // Grant DynamoDB permissions for copilot tables
+    copilotConversationsTable.grantReadWriteData(copilotExecutionRole);
+    copilotConnectionsTable.grantReadWriteData(copilotExecutionRole);
+    copilotAnalyticsTable.grantReadWriteData(copilotExecutionRole);
+    this.mainTable.grantReadWriteData(copilotExecutionRole);
+
+    // Grant Bedrock permissions for Claude 3.5 Sonnet
+    copilotExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
+        ],
+        resources: [
+          `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0`,
+          `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
+        ],
+      })
+    );
+
+    // Grant KMS permissions
+    this.kmsKey.grantDecrypt(copilotExecutionRole);
+
+    // Grant Secrets Manager permissions
+    this.secretsManagerSecret.grantRead(copilotExecutionRole);
+
     // Common Lambda environment variables (Redis endpoint will be added after cluster creation)
     const lambdaEnvironment = {
       USER_POOL_ID: this.userPool.userPoolId,
@@ -583,6 +786,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -601,6 +805,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -619,6 +824,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -637,6 +843,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -722,6 +929,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -754,6 +962,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -785,6 +994,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -819,6 +1029,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -850,6 +1061,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -881,6 +1093,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -913,6 +1126,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -945,6 +1159,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -978,6 +1193,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1003,6 +1219,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1037,6 +1254,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [this.lambdaSecurityGroup],
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1107,6 +1325,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1124,6 +1343,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1141,6 +1361,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: lambdaExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1215,6 +1436,193 @@ export class InfrastructureStack extends cdk.Stack {
     wsDefaultFunction.addPermission('ApiGatewayInvokeDefault', {
       principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
       sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${this.webSocketApi.ref}/*`,
+    });
+
+    // ========================================
+    // AI Copilot WebSocket API
+    // ========================================
+    const copilotWebSocketLogGroup = new logs.LogGroup(this, 'CopilotWebSocketApiLogs', {
+      logGroupName: '/aws/apigateway/omnitrack-copilot-websocket',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const copilotWebSocketApi = new apigatewayv2.CfnApi(this, 'CopilotWebSocketApi', {
+      name: 'omnitrack-copilot-websocket-api',
+      protocolType: 'WEBSOCKET',
+      routeSelectionExpression: '$request.body.action',
+      description: 'OmniTrack AI Copilot WebSocket API for conversational interface',
+    });
+
+    const copilotWebSocketStage = new apigatewayv2.CfnStage(this, 'CopilotWebSocketStage', {
+      apiId: copilotWebSocketApi.ref,
+      stageName: 'prod',
+      autoDeploy: true,
+      defaultRouteSettings: {
+        dataTraceEnabled: true,
+        loggingLevel: 'INFO',
+        throttlingBurstLimit: 1000,
+        throttlingRateLimit: 500,
+      },
+      accessLogSettings: {
+        destinationArn: copilotWebSocketLogGroup.logGroupArn,
+        format: JSON.stringify({
+          requestId: '$context.requestId',
+          ip: '$context.identity.sourceIp',
+          requestTime: '$context.requestTime',
+          routeKey: '$context.routeKey',
+          status: '$context.status',
+          connectionId: '$context.connectionId',
+        }),
+      },
+    });
+
+    // Copilot Lambda environment variables
+    const copilotEnvironment = {
+      USER_POOL_ID: this.userPool.userPoolId,
+      USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+      TABLE_NAME: this.mainTable.tableName,
+      CONVERSATIONS_TABLE_NAME: copilotConversationsTable.tableName,
+      CONNECTIONS_TABLE_NAME: copilotConnectionsTable.tableName,
+      SECRETS_ARN: this.secretsManagerSecret.secretArn,
+      KMS_KEY_ID: this.kmsKey.keyId,
+      BEDROCK_MODEL_ID: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      BEDROCK_REGION: cdk.Aws.REGION,
+      WEBSOCKET_API_ENDPOINT: `https://${copilotWebSocketApi.ref}.execute-api.${cdk.Aws.REGION}.amazonaws.com/prod`,
+    };
+
+    // Copilot WebSocket Connect Handler
+    const copilotConnectFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotConnectFunction', {
+      functionName: 'omnitrack-copilot-connect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'connectHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        forceDockerBundling: false,
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Copilot WebSocket Disconnect Handler
+    const copilotDisconnectFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotDisconnectFunction', {
+      functionName: 'omnitrack-copilot-disconnect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'disconnectHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        forceDockerBundling: false,
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Copilot WebSocket Message Handler (main copilot logic)
+    const copilotMessageFunction = new lambdaNodejs.NodejsFunction(this, 'CopilotMessageFunction', {
+      functionName: 'omnitrack-copilot-message',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'messageHandler',
+      entry: path.join(__dirname, '../lambda/copilot/websocket-handler.ts'),
+      timeout: cdk.Duration.seconds(60), // Longer timeout for Bedrock API calls
+      memorySize: 1024, // More memory for AI processing
+      environment: copilotEnvironment,
+      role: copilotExecutionRole,
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: {
+        forceDockerBundling: false,
+        minify: true,
+        sourceMap: true,
+        externalModules: ['aws-sdk', '@aws-sdk/client-bedrock-runtime'],
+      },
+    });
+
+    // Grant WebSocket management permissions to copilot functions
+    const copilotWsManageConnectionsPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['execute-api:ManageConnections'],
+      resources: [
+        `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+      ],
+    });
+
+    copilotConnectFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+    copilotDisconnectFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+    copilotMessageFunction.addToRolePolicy(copilotWsManageConnectionsPolicy);
+
+    // Copilot WebSocket Integrations
+    const copilotConnectIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotConnectIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotConnectFunction.functionArn}/invocations`,
+    });
+
+    const copilotDisconnectIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotDisconnectIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotDisconnectFunction.functionArn}/invocations`,
+    });
+
+    const copilotMessageIntegration = new apigatewayv2.CfnIntegration(this, 'CopilotMessageIntegration', {
+      apiId: copilotWebSocketApi.ref,
+      integrationType: 'AWS_PROXY',
+      integrationUri: `arn:aws:apigateway:${cdk.Aws.REGION}:lambda:path/2015-03-31/functions/${copilotMessageFunction.functionArn}/invocations`,
+    });
+
+    // Copilot WebSocket Routes
+    new apigatewayv2.CfnRoute(this, 'CopilotConnectRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$connect',
+      authorizationType: 'NONE', // Authentication handled in Lambda
+      target: `integrations/${copilotConnectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotDisconnectRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$disconnect',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotDisconnectIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotMessageRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: 'message',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotMessageIntegration.ref}`,
+    });
+
+    new apigatewayv2.CfnRoute(this, 'CopilotDefaultRoute', {
+      apiId: copilotWebSocketApi.ref,
+      routeKey: '$default',
+      authorizationType: 'NONE',
+      target: `integrations/${copilotMessageIntegration.ref}`,
+    });
+
+    // Grant API Gateway permission to invoke copilot functions
+    copilotConnectFunction.addPermission('CopilotApiGatewayInvokeConnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+    });
+
+    copilotDisconnectFunction.addPermission('CopilotApiGatewayInvokeDisconnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
+    });
+
+    copilotMessageFunction.addPermission('CopilotApiGatewayInvokeMessage', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:${copilotWebSocketApi.ref}/*`,
     });
 
     // ========================================
@@ -1301,6 +1709,7 @@ export class InfrastructureStack extends cdk.Stack {
       role: iotExecutionRole,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
+        forceDockerBundling: false,
         minify: true,
         sourceMap: true,
         externalModules: ['aws-sdk'],
@@ -1360,64 +1769,7 @@ export class InfrastructureStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // ========================================
-    // ElastiCache Redis Cluster for Caching
-    // ========================================
-
-    // Create subnet group for Redis cluster
-    const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
-      description: 'Subnet group for ElastiCache Redis cluster',
-      subnetIds: this.vpc.privateSubnets.map(subnet => subnet.subnetId),
-      cacheSubnetGroupName: 'omnitrack-redis-subnet-group',
-    });
-
-    // Create parameter group for Redis configuration
-    const redisParameterGroup = new elasticache.CfnParameterGroup(this, 'RedisParameterGroup', {
-      cacheParameterGroupFamily: 'redis7',
-      description: 'Parameter group for OmniTrack Redis cluster',
-      properties: {
-        'maxmemory-policy': 'allkeys-lru', // Evict least recently used keys when memory is full
-        'timeout': '300', // Close idle connections after 5 minutes
-      },
-    });
-
-    // Create ElastiCache Redis cluster
-    this.redisCluster = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
-      cacheNodeType: 'cache.t3.micro', // Small instance for development, scale up for production
-      engine: 'redis',
-      engineVersion: '7.0',
-      numCacheNodes: 1, // Single node for development, use replication group for production
-      clusterName: 'omnitrack-redis-cluster',
-      cacheSubnetGroupName: redisSubnetGroup.cacheSubnetGroupName,
-      vpcSecurityGroupIds: [this.redisSecurityGroup.securityGroupId],
-      cacheParameterGroupName: redisParameterGroup.ref,
-      port: 6379,
-      autoMinorVersionUpgrade: true,
-      preferredMaintenanceWindow: 'sun:05:00-sun:06:00', // Sunday 5-6 AM UTC
-      snapshotRetentionLimit: 5, // Keep 5 daily snapshots
-      snapshotWindow: '03:00-04:00', // Daily snapshot at 3-4 AM UTC
-      tags: [
-        {
-          key: 'Name',
-          value: 'OmniTrack Redis Cluster',
-        },
-        {
-          key: 'Environment',
-          value: 'production',
-        },
-      ],
-    });
-
-    // Ensure subnet group is created before cluster
-    this.redisCluster.addDependency(redisSubnetGroup);
-
-    // Update Lambda environment variables with Redis configuration
-    // Note: Lambda functions created before this point will need to be updated
-    // to include Redis configuration if they need caching capabilities
-    const redisEnvironment = {
-      REDIS_HOST: this.redisCluster.attrRedisEndpointAddress,
-      REDIS_PORT: this.redisCluster.attrRedisEndpointPort,
-    };
+    // Redis cluster already created earlier in the stack (after security groups)
 
     // ========================================
     // CloudWatch Logs and X-Ray Tracing
@@ -1967,6 +2319,37 @@ export class InfrastructureStack extends cdk.Stack {
       value: this.lambdaSecurityGroup.securityGroupId,
       description: 'Lambda Security Group ID',
       exportName: 'OmniTrack-LambdaSecurityGroup',
+    });
+
+    // AI Copilot outputs
+    new cdk.CfnOutput(this, 'CopilotWebSocketApiId', {
+      value: copilotWebSocketApi.ref,
+      description: 'AI Copilot WebSocket API Gateway ID',
+      exportName: 'OmniTrack-CopilotWebSocketApiId',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotWebSocketApiUrl', {
+      value: `wss://${copilotWebSocketApi.ref}.execute-api.${cdk.Aws.REGION}.amazonaws.com/prod`,
+      description: 'AI Copilot WebSocket API Gateway URL',
+      exportName: 'OmniTrack-CopilotWebSocketApiUrl',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotConversationsTableName', {
+      value: copilotConversationsTable.tableName,
+      description: 'AI Copilot Conversations DynamoDB Table Name',
+      exportName: 'OmniTrack-CopilotConversationsTable',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotConnectionsTableName', {
+      value: copilotConnectionsTable.tableName,
+      description: 'AI Copilot Connections DynamoDB Table Name',
+      exportName: 'OmniTrack-CopilotConnectionsTable',
+    });
+
+    new cdk.CfnOutput(this, 'CopilotMessageFunctionArn', {
+      value: copilotMessageFunction.functionArn,
+      description: 'AI Copilot Message Handler Lambda Function ARN',
+      exportName: 'OmniTrack-CopilotMessageFunctionArn',
     });
   }
 }

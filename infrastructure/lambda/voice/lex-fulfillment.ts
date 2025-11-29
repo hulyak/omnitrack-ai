@@ -132,10 +132,10 @@ function buildSuccessResponse(
   audioResponse: string,
   visualData?: any
 ): LexResponse {
-  const sessionAttributes = {
+  const sessionAttributes: Record<string, string> = {
     ...event.sessionState.sessionAttributes,
     lastExecutionStatus: 'success',
-    visualData: visualData ? JSON.stringify(visualData) : undefined,
+    ...(visualData ? { visualData: JSON.stringify(visualData) } : {}),
   };
 
   return {

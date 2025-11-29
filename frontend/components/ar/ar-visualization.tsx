@@ -139,7 +139,8 @@ export function ARVisualization({
       if (!isARMode) {
         // Request AR session
         if ('xr' in navigator && navigator.xr) {
-          const supported = await navigator.xr.isSessionSupported('immersive-ar');
+          const xr = navigator.xr as any; // WebXR types not fully supported in TypeScript
+          const supported = await xr.isSessionSupported('immersive-ar');
           if (supported) {
             setIsARMode(true);
             setViewState((prev) => ({ ...prev, mode: '3D' }));

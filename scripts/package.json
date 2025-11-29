@@ -1,0 +1,22 @@
+{
+  "name": "omnitrack-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for OmniTrack AI",
+  "scripts": {
+    "seed-demo": "ts-node seed-demo-data.ts",
+    "create-users": "ts-node create-test-users.ts",
+    "iot-simulator": "ts-node iot-simulator-control.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.490.0",
+    "@aws-sdk/client-iot-data-plane": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0",
+    "@aws-sdk/util-dynamodb": "^3.490.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}

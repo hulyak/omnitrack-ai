@@ -319,7 +319,7 @@ describe('Audit Service Property Tests', () => {
             snsMock.on(PublishCommand).resolves({ MessageId: 'test-message-id' });
 
             // Import the function that triggers suspicious activity check
-            const { logAuthenticationEvent } = await import('./audit-service');
+            const { logAuthenticationEvent } = await import('./audit-service.js');
 
             await logAuthenticationEvent(
               testData.userIdentity,
@@ -388,7 +388,7 @@ describe('Audit Service Property Tests', () => {
             dynamoMock.on(PutCommand).resolves({});
             snsMock.on(PublishCommand).resolves({ MessageId: 'test-message-id' });
 
-            const { logAuthenticationEvent } = await import('./audit-service');
+            const { logAuthenticationEvent } = await import('./audit-service.js');
 
             await logAuthenticationEvent(
               testData.userIdentity,
@@ -455,7 +455,7 @@ describe('Audit Service Property Tests', () => {
             dynamoMock.on(PutCommand).resolves({});
             snsMock.on(PublishCommand).resolves({ MessageId: 'test-message-id' });
 
-            const { logAuthenticationEvent } = await import('./audit-service');
+            const { logAuthenticationEvent } = await import('./audit-service.js');
 
             await logAuthenticationEvent(
               testData.userIdentity,

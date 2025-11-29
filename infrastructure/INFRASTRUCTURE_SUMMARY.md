@@ -295,17 +295,181 @@ The following outputs are exported for use by other stacks and applications:
    - Serverless architecture (no idle compute costs)
    - Managed services (no infrastructure overhead)
 
+## Task 15: ElastiCache Redis for Caching
+
+### Implementation Date
+November 27, 2024
+
+### Status
+✅ **COMPLETED**
+
+### Components Implemented
+
+#### 1. ElastiCache Redis Cluster ✅
+- **Cluster Configuration**:
+  - Cluster name: `omnitrack-redis-cluster`
+  - Engine: Redis 7.0
+  - Node type: `cache.t3.micro` (scalable for production)
+  - Number of nodes: 1 (single node for development)
+  - Port: 6379
+  - Auto minor version upgrade enabled
+
+- **Network Configuration**:
+  - Deployed in VPC private subnets
+  - Subnet group spans all 3 availability zones
+  - Security group restricts access to VPC CIDR only
+
+- **Backup & Maintenance**:
+  - Snapshot retention: 5 daily snapshots
+  - Snapshot window: 3:00-4:00 AM UTC
+  - Maintenance window: Sunday 5:00-6:00 AM UTC
+
+- **Parameter Group**:
+  - Family: redis7
+  - Max memory policy: `allkeys-lru` (evict least recently used keys)
+  - Timeout: 300 seconds (close idle connections)
+
+#### 2. Cache Service Implementation ✅
+- **Module Location**: `infrastructure/lambda/cache/`
+- **Main Service**: `cache-service.ts`
+- **Features**:
+  - Simulation result caching (1-hour TTL)
+  - User session caching (24-hour TTL)
+  - Digital twin state caching (5-minute TTL)
+  - Generic key-value operations with custom TTL
+  - Connection pooling and reuse
+  - Error handling and logging
+
+- **Cache Operations**:
+  - `cacheSimulationResult()` - Cache simulation results
+  - `getSimulationResult()` - Retrieve cached simulations
+  - `cacheSession()` - Cache user sessions
+  - `getSession()` - Retrieve user sessions
+  - `updateSessionActivity()` - Update session timestamps
+  - `deleteSession()` - Remove sessions
+  - `cacheDigitalTwinState()` - Cache digital twin snapshots
+  - `getDigitalTwinState()` - Retrieve specific snapshot
+  - `getLatestDigitalTwinState()` - Get most recent snapshot
+  - `invalidateDigitalTwinCache()` - Clear all digital twin caches
+  - Generic `set()`, `get()`, `delete()`, `exists()`, `getTTL()` operations
+
+#### 3. Security Configuration ✅
+- **Security Group**:
+  - Name: `RedisSecurityGroup`
+  - Inbound: Port 6379 from VPC CIDR only
+  - Outbound: All traffic allowed
+  - Prevents external access to Redis cluster
+
+- **Network Isolation**:
+  - Redis cluster deployed in private subnets
+  - No public IP addresses
+  - Accessible only from Lambda functions in VPC
+
+#### 4. Lambda Integration ✅
+- **Environment Variables**:
+  - `REDIS_HOST`: ElastiCache cluster endpoint
+  - `REDIS_PORT`: Redis port (6379)
+
+- **VPC Access**:
+  - Lambda execution role updated with VPC access policy
+  - Lambda functions can connect to Redis in private subnets
+
+- **Dependencies**:
+  - `redis` npm package (v4.7.0) added to Lambda dependencies
+  - TypeScript types included
+
+#### 5. Documentation ✅
+- **README**: Comprehensive usage guide in `infrastructure/lambda/cache/README.md`
+- **Example Code**: `cache-example.ts` with Lambda handler examples
+- **API Documentation**: Inline JSDoc comments for all methods
+
+### TTL Policies Configured
+
+| Cache Type | TTL | Use Case |
+|------------|-----|----------|
+| Simulation Results | 1 hour (3600s) | Expensive computations, moderate freshness |
+| User Sessions | 24 hours (86400s) | User context, preferences, active scenarios |
+| Digital Twin State | 5 minutes (300s) | Real-time data, frequent updates |
+| Custom Keys | Configurable | Application-specific caching needs |
+
+### Stack Outputs Added
+
+| Output Name | Description | Export Name |
+|-------------|-------------|-------------|
+| RedisClusterEndpoint | Redis cluster endpoint address | OmniTrack-RedisEndpoint |
+| RedisClusterPort | Redis cluster port | OmniTrack-RedisPort |
+| RedisSecurityGroupId | Security group ID | OmniTrack-RedisSecurityGroup |
+
+### Requirements Validation
+
+#### Requirement 11.4: Caching for performance ✅
+- ElastiCache Redis cluster provides high-performance caching
+- Simulation results cached to avoid redundant computations
+- Session data cached to reduce database queries
+- Digital twin state cached for fast access
+
+### Testing
+
+#### Build Status
+✅ TypeScript compilation successful
+✅ No linting errors
+✅ No type errors
+✅ Redis client dependency installed
+
+#### Cache Service Tests
+- Cache service module compiles without errors
+- All TypeScript interfaces properly defined
+- Example Lambda handlers demonstrate usage patterns
+
+### Resource Count
+
+| Resource Type | Count |
+|---------------|-------|
+| ElastiCache Clusters | 1 |
+| ElastiCache Subnet Groups | 1 |
+| ElastiCache Parameter Groups | 1 |
+| Security Groups | 1 |
+| Lambda Environment Variables | 2 (REDIS_HOST, REDIS_PORT) |
+
+### Performance Characteristics
+
+- **Latency**: Sub-millisecond read/write operations
+- **Throughput**: Thousands of operations per second
+- **Memory**: Configurable based on node type
+- **Scalability**: Can add read replicas or upgrade node type
+- **Availability**: Single node (can upgrade to multi-AZ replication group)
+
+### Cost Optimization
+
+- **Node Type**: `cache.t3.micro` for development (low cost)
+- **Snapshots**: 5 daily snapshots for disaster recovery
+- **Auto Minor Upgrades**: Automatic security patches
+- **Production Scaling**: Can upgrade to larger nodes or add replicas as needed
+
+### Integration Examples
+
+The cache service can be integrated into existing Lambda functions:
+
+```typescript
+import { initializeCacheService } from './cache/cache-service';
+
+export async function handler(event: any) {
+  const cache = await initializeCacheService();
+  
+  // Check cache first
+  const cached = await cache.getSimulationResult(scenarioId, hash);
+  if (cached) return cached;
+  
+  // Compute and cache
+  const result = await expensiveComputation();
+  await cache.cacheSimulationResult(scenarioId, hash, result);
+  return result;
+}
+```
+
 ## Next Steps
 
-The infrastructure foundation is now ready for:
-1. Lambda function deployment (Task 3+)
-2. IoT Core integration (Task 6)
-3. Amazon Bedrock integration (Task 8+)
-4. ElastiCache Redis cluster (Task 15)
-5. OpenSearch domain (Task 14)
-6. Step Functions state machines (Task 12)
-7. SNS topics for notifications (Task 7)
-8. SageMaker integration (Task 13)
+The infrastructure found
 
 ## Deployment Instructions
 

@@ -1,18 +1,23 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeroSection } from '@/components/landing/hero-section';
 import { CommandCenter } from '@/components/landing/command-center';
 import { AgentCapabilities } from '@/components/landing/agent-capabilities';
 import { InteractiveDemo } from '@/components/landing/interactive-demo';
 import { TrustSignals } from '@/components/landing/trust-signals';
-import { WaitlistFooter } from '@/components/landing/waitlist-footer';
 
 export default function Home() {
   const router = useRouter();
 
+  const handleGetStarted = () => {
+    router.push('/login');
+  };
+
   const handleTryDemo = () => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
     // Scroll to command center and auto-start simulation
     const commandCenter = document.getElementById('command-center');
     if (commandCenter) {
@@ -28,6 +33,9 @@ export default function Home() {
   };
 
   const handleShowAgents = () => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
     // Scroll to interactive demo section
     const demoSection = document.getElementById('interactive-demo');
     if (demoSection) {
@@ -37,7 +45,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-950">
-      <HeroSection onTryDemo={handleTryDemo} onShowAgents={handleShowAgents} />
+      <HeroSection 
+        onGetStarted={handleGetStarted}
+        onTryDemo={handleTryDemo} 
+        onShowAgents={handleShowAgents} 
+      />
       <div id="command-center">
         <CommandCenter />
       </div>
@@ -46,7 +58,6 @@ export default function Home() {
         <InteractiveDemo />
       </div>
       <TrustSignals />
-      <WaitlistFooter />
     </main>
   );
 }

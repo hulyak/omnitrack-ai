@@ -19,7 +19,12 @@
     "test:all": "npm test --workspaces",
     "lint:all": "npm run lint --workspaces",
     "format:all": "npm run format --workspaces",
-    "install:all": "npm install --workspaces"
+    "install:all": "npm install --workspaces",
+    "seed-demo-data": "cd scripts && npm run seed-demo",
+    "create-test-users": "cd scripts && npm run create-users",
+    "start-iot-simulator": "cd scripts && npm run iot-simulator start",
+    "stop-iot-simulator": "cd scripts && npm run iot-simulator stop",
+    "iot-simulator-status": "cd scripts && npm run iot-simulator status"
   },
   "keywords": [
     "supply-chain",

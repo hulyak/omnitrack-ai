@@ -252,6 +252,8 @@ describe('Property 2: Multi-channel notification delivery', () => {
 
           // Property: All channels should have a delivery attempt
           expect(deliveryResults.length).toBe(uniqueChannels.length);
+          
+          return true;
         }
       ),
       { numRuns: 100 }

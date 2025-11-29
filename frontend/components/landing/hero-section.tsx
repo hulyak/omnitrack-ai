@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 
 interface HeroSectionProps {
+  onGetStarted: () => void;
   onTryDemo: () => void;
   onShowAgents: () => void;
 }
@@ -20,7 +21,7 @@ interface AgentNode {
   active: boolean;
 }
 
-export function HeroSection({ onTryDemo, onShowAgents }: HeroSectionProps) {
+export function HeroSection({ onGetStarted, onTryDemo, onShowAgents }: HeroSectionProps) {
   const [nodes, setNodes] = useState<AgentNode[]>([
     { id: 1, x: 20, y: 30, type: 'info', active: false },
     { id: 2, x: 40, y: 60, type: 'scenario', active: false },
@@ -85,6 +86,18 @@ export function HeroSection({ onTryDemo, onShowAgents }: HeroSectionProps) {
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        {/* Logo */}
+        <div className="mb-12 flex justify-center">
+          <img 
+            src="/omnitrack-logo-horizontal.svg" 
+            alt="OmniTrack AI" 
+            className="h-20 sm:h-24 lg:h-28 w-auto"
+            style={{
+              filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))',
+            }}
+          />
+        </div>
+
         {/* Main Heading with Neon Glow */}
         <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold mb-6 leading-tight">
           <span
@@ -114,30 +127,29 @@ export function HeroSection({ onTryDemo, onShowAgents }: HeroSectionProps) {
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
           <button
-            onClick={onTryDemo}
-            className="group relative px-10 py-5 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 text-white text-lg font-bold rounded-xl shadow-2xl hover:shadow-cyan-500/50 transform hover:scale-105 transition-all duration-300 overflow-hidden animate-float"
+            onClick={onGetStarted}
+            className="group relative px-12 py-6 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 text-white text-xl font-bold rounded-xl shadow-2xl hover:shadow-cyan-500/50 transform hover:scale-105 transition-all duration-300 overflow-hidden"
             style={{
               boxShadow: '0 0 30px rgba(6, 182, 212, 0.4), 0 0 60px rgba(6, 182, 212, 0.2)',
             }}
           >
             <span className="relative z-10 flex items-center gap-3">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              LAUNCH LIVE SIMULATOR
+              GET STARTED
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </button>
 
           <button
-            onClick={onShowAgents}
+            onClick={onTryDemo}
             className="px-10 py-5 bg-transparent text-cyan-300 text-lg font-bold rounded-xl border-2 border-cyan-500/50 hover:bg-cyan-500/10 hover:border-cyan-400 transition-all duration-300"
             style={{
               boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)',
             }}
           >
-            See Agents in Action
+            Watch Demo
           </button>
         </div>
 
