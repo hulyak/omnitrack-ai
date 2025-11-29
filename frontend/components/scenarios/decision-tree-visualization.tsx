@@ -44,7 +44,7 @@ export function DecisionTreeVisualization({ tree }: DecisionTreeVisualizationPro
       .append('path')
       .attr('class', 'link')
       .attr('fill', 'none')
-      .attr('stroke', '#cbd5e1')
+      .attr('stroke', '#64748b')
       .attr('stroke-width', 2)
       .attr(
         'd',
@@ -87,7 +87,7 @@ export function DecisionTreeVisualization({ tree }: DecisionTreeVisualizationPro
       .attr('x', (d: any) => (d.children ? -12 : 12))
       .attr('text-anchor', (d: any) => (d.children ? 'end' : 'start'))
       .attr('font-size', '12px')
-      .attr('fill', '#374151')
+      .attr('fill', '#e2e8f0')
       .text((d: any) => {
         const label = d.data.label;
         const value = d.data.value;
@@ -105,7 +105,7 @@ export function DecisionTreeVisualization({ tree }: DecisionTreeVisualizationPro
       .attr('x', (d: any) => (d.children ? -12 : 12))
       .attr('text-anchor', (d: any) => (d.children ? 'end' : 'start'))
       .attr('font-size', '10px')
-      .attr('fill', '#9ca3af')
+      .attr('fill', '#cbd5e1')
       .text((d: any) => `(${d.data.agent})`);
 
     // Add confidence badges
@@ -126,22 +126,22 @@ export function DecisionTreeVisualization({ tree }: DecisionTreeVisualizationPro
       <div className="mb-4 flex items-center space-x-4 text-sm">
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded-full bg-green-500" />
-          <span className="text-gray-600">High Confidence (≥80%)</span>
+          <span className="text-slate-200">High Confidence (≥80%)</span>
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded-full bg-blue-500" />
-          <span className="text-gray-600">Good Confidence (60-79%)</span>
+          <span className="text-slate-200">Good Confidence (60-79%)</span>
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded-full bg-orange-500" />
-          <span className="text-gray-600">Medium Confidence (40-59%)</span>
+          <span className="text-slate-200">Medium Confidence (40-59%)</span>
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded-full bg-red-500" />
-          <span className="text-gray-600">Low Confidence (&lt;40%)</span>
+          <span className="text-slate-200">Low Confidence (&lt;40%)</span>
         </div>
       </div>
-      <svg ref={svgRef} className="border border-gray-200 rounded-lg bg-white" />
+      <svg ref={svgRef} className="border border-slate-700 rounded-lg bg-slate-800/50" />
     </div>
   );
 }

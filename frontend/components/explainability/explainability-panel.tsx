@@ -21,13 +21,13 @@ export function ExplainabilityPanel({ data, className = '' }: ExplainabilityPane
   const { summary, decisionTree, agentContributions, uncertaintyRanges, overallConfidence } = data;
 
   return (
-    <div className={`bg-white rounded-lg shadow ${className}`}>
+    <div className={`bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 ${className}`}>
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 border-b border-slate-800/50">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">AI Explainability</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-xl font-semibold text-white">AI Explainability</h2>
+            <p className="text-sm text-slate-400 mt-1">
               Understand how the AI reached its recommendations
             </p>
           </div>
@@ -36,7 +36,7 @@ export function ExplainabilityPanel({ data, className = '' }: ExplainabilityPane
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-slate-800/50">
         <nav className="flex -mb-px">
           <TabButton
             label="Summary"
@@ -105,8 +105,8 @@ function TabButton({ label, active, onClick, icon }: TabButtonProps) {
       onClick={onClick}
       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
         active
-          ? 'border-blue-600 text-blue-600'
-          : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+          ? 'border-purple-500 text-purple-400'
+          : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
       }`}
     >
       <span>{icon}</span>
@@ -132,7 +132,7 @@ function SummaryTab({
       {/* Quick Agent Overview */}
       {agentContributions && agentContributions.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Contributing Agents</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">Contributing Agents</h3>
           <div className="flex flex-wrap gap-2">
             {agentContributions.map((contribution) => (
               <AgentAttributionBadge
@@ -148,21 +148,21 @@ function SummaryTab({
 
       {/* Key Insights */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Key Insights</h3>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <ul className="space-y-2 text-sm text-gray-700">
+        <h3 className="text-lg font-semibold text-white mb-3">Key Insights</h3>
+        <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+          <ul className="space-y-2 text-sm text-slate-300">
             <li className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
+              <span className="text-blue-400 mr-2">•</span>
               <span>
                 The recommendation is based on analysis from multiple specialized AI agents
               </span>
             </li>
             <li className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
+              <span className="text-blue-400 mr-2">•</span>
               <span>Overall confidence level: {(confidence * 100).toFixed(0)}%</span>
             </li>
             <li className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
+              <span className="text-blue-400 mr-2">•</span>
               <span>Explore the Decision Tree tab to see the detailed reasoning path</span>
             </li>
           </ul>
@@ -183,9 +183,9 @@ function DecisionTreeTab({
 }) {
   return (
     <div className="space-y-4">
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">How to Read This Tree</h3>
-        <p className="text-sm text-gray-600">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-white mb-2">How to Read This Tree</h3>
+        <p className="text-sm text-slate-300">
           This decision tree shows the reasoning path the AI followed to reach its recommendations.
           Each node represents a decision point or analysis step. Node colors indicate confidence
           levels, and agent labels show which AI component contributed each insight.
@@ -199,9 +199,9 @@ function DecisionTreeTab({
       />
 
       {selectedNode && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Node Details</h3>
-          <p className="text-sm text-gray-600">Selected node: {selectedNode}</p>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-white mb-2">Node Details</h3>
+          <p className="text-sm text-slate-300">Selected node: {selectedNode}</p>
         </div>
       )}
     </div>
@@ -211,14 +211,14 @@ function DecisionTreeTab({
 function AgentsTab({ agentContributions }: { agentContributions: any[] }) {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-slate-300">
         Multiple specialized AI agents collaborated to generate this recommendation. Each agent
         focuses on a specific aspect of supply chain analysis.
       </p>
 
       <div className="space-y-4">
         {agentContributions.map((contribution) => (
-          <div key={contribution.agentId} className="border border-gray-200 rounded-lg p-4">
+          <div key={contribution.agentId} className="border border-slate-700/50 bg-slate-800/30 rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
                 <AgentAttributionBadge
@@ -227,19 +227,19 @@ function AgentsTab({ agentContributions }: { agentContributions: any[] }) {
                   size="large"
                 />
                 <div>
-                  <h4 className="font-semibold text-gray-900">{contribution.agentName}</h4>
-                  <p className="text-sm text-gray-600">{contribution.role}</p>
+                  <h4 className="font-semibold text-white">{contribution.agentName}</h4>
+                  <p className="text-sm text-slate-400">{contribution.role}</p>
                 </div>
               </div>
               <ConfidenceIndicator confidence={contribution.confidence} size="small" showLabel />
             </div>
 
             <div className="space-y-2">
-              <h5 className="text-sm font-semibold text-gray-900">Key Contributions:</h5>
+              <h5 className="text-sm font-semibold text-white">Key Contributions:</h5>
               <ul className="space-y-1">
                 {contribution.insights.map((insight: string, idx: number) => (
-                  <li key={idx} className="text-sm text-gray-700 flex items-start">
-                    <span className="text-blue-600 mr-2">•</span>
+                  <li key={idx} className="text-sm text-slate-300 flex items-start">
+                    <span className="text-purple-400 mr-2">•</span>
                     <span>{insight}</span>
                   </li>
                 ))}
@@ -247,8 +247,8 @@ function AgentsTab({ agentContributions }: { agentContributions: any[] }) {
             </div>
 
             {contribution.dataSourcesUsed && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-600">
+              <div className="mt-3 pt-3 border-t border-slate-700/50">
+                <p className="text-xs text-slate-400">
                   Data sources: {contribution.dataSourcesUsed.join(', ')}
                 </p>
               </div>
@@ -263,9 +263,9 @@ function AgentsTab({ agentContributions }: { agentContributions: any[] }) {
 function UncertaintyTab({ uncertaintyRanges }: { uncertaintyRanges: any }) {
   return (
     <div className="space-y-6">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Understanding Uncertainty</h3>
-        <p className="text-sm text-gray-700">
+      <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-white mb-2">Understanding Uncertainty</h3>
+        <p className="text-sm text-slate-300">
           All AI predictions involve some degree of uncertainty. These ranges show the possible
           variation in predicted outcomes based on different scenarios and assumptions.
         </p>
@@ -273,9 +273,9 @@ function UncertaintyTab({ uncertaintyRanges }: { uncertaintyRanges: any }) {
 
       <div className="space-y-4">
         {Object.entries(uncertaintyRanges).map(([metric, range]: [string, any]) => (
-          <div key={metric} className="border border-gray-200 rounded-lg p-4">
+          <div key={metric} className="border border-slate-700/50 bg-slate-800/30 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-gray-900 capitalize">
+              <h4 className="font-semibold text-white capitalize">
                 {metric.replace(/([A-Z])/g, ' $1').trim()}
               </h4>
               <ConfidenceIndicator confidence={range.confidence} size="small" showLabel />
@@ -283,20 +283,20 @@ function UncertaintyTab({ uncertaintyRanges }: { uncertaintyRanges: any }) {
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Best Case:</span>
-                <span className="font-semibold text-green-600">
+                <span className="text-slate-400">Best Case:</span>
+                <span className="font-semibold text-green-400">
                   {formatValue(range.bestCase, metric)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Expected:</span>
-                <span className="font-semibold text-gray-900">
+                <span className="text-slate-400">Expected:</span>
+                <span className="font-semibold text-white">
                   {formatValue(range.expected, metric)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Worst Case:</span>
-                <span className="font-semibold text-red-600">
+                <span className="text-slate-400">Worst Case:</span>
+                <span className="font-semibold text-red-400">
                   {formatValue(range.worstCase, metric)}
                 </span>
               </div>
@@ -304,19 +304,19 @@ function UncertaintyTab({ uncertaintyRanges }: { uncertaintyRanges: any }) {
 
             {/* Visual range indicator */}
             <div className="mt-3">
-              <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="relative h-2 bg-slate-700 rounded-full overflow-hidden">
                 <div
                   className="absolute h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
                   style={{ width: '100%' }}
                 />
                 <div
-                  className="absolute h-full w-1 bg-gray-900"
+                  className="absolute h-full w-1 bg-white"
                   style={{
                     left: `${calculatePosition(range)}%`,
                   }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-slate-400 mt-1">
                 <span>Best</span>
                 <span>Expected</span>
                 <span>Worst</span>
@@ -324,8 +324,8 @@ function UncertaintyTab({ uncertaintyRanges }: { uncertaintyRanges: any }) {
             </div>
 
             {range.assumptions && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-600">
+              <div className="mt-3 pt-3 border-t border-slate-700/50">
+                <p className="text-xs text-slate-400">
                   <span className="font-semibold">Assumptions:</span> {range.assumptions}
                 </p>
               </div>

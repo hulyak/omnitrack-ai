@@ -166,11 +166,24 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
     setError(null);
 
     try {
-      const result = await apiClient.post<VoiceCommandResult>('/voice/command', {
+      const response = await apiClient.post<any>('/voice/command', {
+        command: commandText,
         userId,
-        transcript: commandText,
-        sessionId: sessionIdRef.current,
+        timestamp: new Date().toISOString(),
       });
+
+      // Transform API response to VoiceCommandResult format
+      const result: VoiceCommandResult = {
+        recognizedIntent: {
+          name: response.intent.name,
+          confidence: response.intent.confidence,
+          slots: {},
+        },
+        audioResponse: response.response.text,
+        visualData: response.data,
+        executionStatus: response.success ? 'success' : 'failed',
+        executionTime: response.executionTime,
+      };
 
       setCurrentResponse(result);
 
@@ -223,13 +236,13 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-lg">
+    <div className="flex flex-col h-full bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">AI Voice Assistant</h2>
+      <div className="flex items-center justify-between p-4 border-b border-slate-800/50">
+        <h2 className="text-xl font-semibold text-white">AI Voice Assistant</h2>
         <button
           onClick={toggleInputMode}
-          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-3 py-1 text-sm text-slate-300 hover:text-purple-400 border border-slate-700 rounded-md hover:bg-slate-800/50 transition-all"
         >
           {useTextFallback ? 'Switch to Voice' : 'Switch to Text'}
         </button>
@@ -238,7 +251,7 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Voice/Text Input Section */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-slate-800/50">
           {!useTextFallback ? (
             <div className="space-y-4">
               {/* Microphone Button */}
@@ -271,7 +284,7 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
 
               {/* Status Text */}
               <div className="text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-300">
                   {isListening 
                     ? 'Listening...' 
                     : isProcessing 
@@ -287,15 +300,15 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
 
               {/* Transcript Display */}
               {transcript && (
-                <div className="p-3 bg-gray-50 rounded-md">
-                  <p className="text-sm text-gray-700">{transcript}</p>
+                <div className="p-3 bg-slate-800/50 rounded-md border border-slate-700/50">
+                  <p className="text-sm text-slate-200">{transcript}</p>
                 </div>
               )}
             </div>
           ) : (
             <form onSubmit={handleTextSubmit} className="space-y-4">
               <div>
-                <label htmlFor="text-input" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="text-input" className="block text-sm font-medium text-slate-300 mb-2">
                   Type your command
                 </label>
                 <input
@@ -305,13 +318,13 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
                   onChange={(e) => setTextInput(e.target.value)}
                   placeholder="e.g., Show me the current status"
                   disabled={isProcessing}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isProcessing || !textInput.trim()}
-                className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
               >
                 {isProcessing ? 'Processing...' : 'Send Command'}
               </button>
@@ -320,21 +333,21 @@ export function VoiceInterface({ userId, onCommandExecuted }: VoiceInterfaceProp
 
           {/* Error Display */}
           {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mt-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
         </div>
 
         {/* Response Section */}
         {currentResponse && (
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
+          <div className="p-6 border-b border-slate-800/50 bg-slate-800/30">
             <AudioResponsePlayer response={currentResponse} />
           </div>
         )}
 
-        {/* Command History */}
-        <div className="flex-1 overflow-hidden">
+        {/* Command History - Made Bigger */}
+        <div className="flex-1 overflow-hidden min-h-[400px]">
           <VoiceCommandHistory history={commandHistory} />
         </div>
       </div>

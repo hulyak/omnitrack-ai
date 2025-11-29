@@ -1,0 +1,14 @@
+{
+  "name": "Run Tests on Save",
+  "description": "Automatically run tests when test files are saved",
+  "enabled": true,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/*.test.{ts,tsx}"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npm test -- ${filePath} --run",
+    "workingDirectory": "frontend"
+  }
+}

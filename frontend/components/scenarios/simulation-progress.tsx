@@ -38,21 +38,21 @@ export function SimulationProgress({ scenarioId, onComplete }: SimulationProgres
   const status = (result as ScenarioResult | undefined)?.status || 'PENDING';
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-slate-900/50 backdrop-blur-xl rounded-lg border border-slate-800/50 shadow-lg p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Simulation in Progress</h2>
-        <p className="text-sm text-gray-600">Analyzing scenario and generating predictions...</p>
+        <h2 className="text-xl font-semibold text-white mb-2">Simulation in Progress</h2>
+        <p className="text-sm text-slate-300">Analyzing scenario and generating predictions...</p>
       </div>
 
       {/* Progress bar */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-slate-200">
             {status === 'RUNNING' ? 'Running' : 'Initializing'}
           </span>
-          <span className="text-sm font-medium text-gray-700">{Math.round(progress)}%</span>
+          <span className="text-sm font-medium text-slate-200">{Math.round(progress)}%</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
           <div
             className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
@@ -83,21 +83,21 @@ export function SimulationProgress({ scenarioId, onComplete }: SimulationProgres
       </div>
 
       {/* Elapsed time */}
-      <div className="flex items-center justify-between text-sm text-gray-600 pt-4 border-t border-gray-200">
+      <div className="flex items-center justify-between text-sm text-slate-300 pt-4 border-t border-slate-700">
         <span>Elapsed time:</span>
         <span className="font-mono">{formatTime(elapsedTime)}</span>
       </div>
 
       {/* Error message */}
       {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">Failed to fetch simulation status. Retrying...</p>
+        <div className="mt-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
+          <p className="text-sm text-red-300">Failed to fetch simulation status. Retrying...</p>
         </div>
       )}
 
       {/* Animated spinner */}
       <div className="mt-6 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
       </div>
     </div>
   );
@@ -113,8 +113,8 @@ function StatusItem({ label, status }: StatusItemProps) {
     <div className="flex items-center space-x-3">
       <div className="flex-shrink-0">
         {status === 'complete' && (
-          <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
-            <svg className="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <div className="h-6 w-6 rounded-full bg-green-900/30 flex items-center justify-center">
+            <svg className="h-4 w-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -124,23 +124,23 @@ function StatusItem({ label, status }: StatusItemProps) {
           </div>
         )}
         {status === 'active' && (
-          <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
-            <div className="h-3 w-3 rounded-full bg-blue-600 animate-pulse" />
+          <div className="h-6 w-6 rounded-full bg-blue-900/30 flex items-center justify-center">
+            <div className="h-3 w-3 rounded-full bg-blue-400 animate-pulse" />
           </div>
         )}
         {status === 'pending' && (
-          <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
-            <div className="h-3 w-3 rounded-full bg-gray-400" />
+          <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center">
+            <div className="h-3 w-3 rounded-full bg-slate-600" />
           </div>
         )}
       </div>
       <span
         className={`text-sm font-medium ${
           status === 'complete'
-            ? 'text-green-700'
+            ? 'text-green-300'
             : status === 'active'
-              ? 'text-blue-700'
-              : 'text-gray-500'
+              ? 'text-blue-300'
+              : 'text-slate-400'
         }`}
       >
         {label}

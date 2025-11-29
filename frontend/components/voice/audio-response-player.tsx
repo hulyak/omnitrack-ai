@@ -79,11 +79,11 @@ export function AudioResponsePlayer({ response }: AudioResponsePlayerProps) {
   const getStatusColor = () => {
     switch (response.executionStatus) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-900/20 border-green-500/50';
       case 'failed':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-900/20 border-red-500/50';
       case 'needs_clarification':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-900/20 border-yellow-500/50';
     }
   };
 
@@ -131,15 +131,15 @@ export function AudioResponsePlayer({ response }: AudioResponsePlayerProps) {
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-semibold text-gray-900">
+            <h4 className="text-sm font-semibold text-white">
               {response.recognizedIntent.name}
-              <span className="ml-2 text-xs text-gray-500 font-normal">
+              <span className="ml-2 text-xs text-slate-400 font-normal">
                 ({Math.round(response.recognizedIntent.confidence * 100)}% confidence)
               </span>
             </h4>
             
             <div className="flex items-center gap-2">
-              <label className="flex items-center text-xs text-gray-600">
+              <label className="flex items-center text-xs text-slate-300">
                 <input
                   type="checkbox"
                   checked={autoPlay}
@@ -152,7 +152,7 @@ export function AudioResponsePlayer({ response }: AudioResponsePlayerProps) {
               {isPlaying ? (
                 <button
                   onClick={stopAudio}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                  className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md"
                   title="Stop audio"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -162,7 +162,7 @@ export function AudioResponsePlayer({ response }: AudioResponsePlayerProps) {
               ) : (
                 <button
                   onClick={playAudio}
-                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md"
+                  className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-md"
                   title="Play audio"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -173,22 +173,22 @@ export function AudioResponsePlayer({ response }: AudioResponsePlayerProps) {
             </div>
           </div>
 
-          <p className="text-sm text-gray-700 mb-3">
+          <p className="text-sm text-slate-200 mb-3">
             {response.audioResponse}
           </p>
 
           {response.requiresClarification && response.clarificationPrompt && (
-            <div className="mt-2 p-2 bg-white rounded border border-yellow-300">
-              <p className="text-xs text-yellow-800">
+            <div className="mt-2 p-2 bg-yellow-900/30 rounded border border-yellow-500/50">
+              <p className="text-xs text-yellow-200">
                 <span className="font-semibold">Clarification needed:</span> {response.clarificationPrompt}
               </p>
             </div>
           )}
 
           {response.visualData && (
-            <div className="mt-3 p-3 bg-white rounded border border-gray-200">
-              <h5 className="text-xs font-semibold text-gray-700 mb-2">Visual Data</h5>
-              <pre className="text-xs text-gray-600 overflow-x-auto">
+            <div className="mt-3 p-3 bg-slate-800/50 rounded border border-slate-700">
+              <h5 className="text-xs font-semibold text-slate-200 mb-2">Visual Data</h5>
+              <pre className="text-xs text-slate-300 overflow-x-auto">
                 {JSON.stringify(response.visualData, null, 2)}
               </pre>
             </div>

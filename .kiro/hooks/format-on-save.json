@@ -1,0 +1,14 @@
+{
+  "name": "Format on Save",
+  "description": "Run Prettier to format code when files are saved",
+  "enabled": true,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/*.{ts,tsx,js,jsx,json,md}"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npx prettier --write ${filePath}",
+    "workingDirectory": "."
+  }
+}

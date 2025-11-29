@@ -41,18 +41,18 @@ export function CarbonFootprintVisualization({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="rounded-lg bg-white p-3 shadow-lg dark:bg-zinc-800">
-          <p className="font-semibold text-text-primary dark:text-zinc-200">{data.name}</p>
-          <p className="text-sm text-text-secondary dark:text-zinc-400">
-            Emissions: {data.value || data.emissions} kg CO₂
+        <div className="rounded-lg bg-slate-800/95 backdrop-blur-sm p-3 shadow-xl border border-slate-700">
+          <p className="font-semibold text-white mb-1">{data.name}</p>
+          <p className="text-sm text-slate-300">
+            Emissions: <span className="font-bold text-blue-400">{(data.value || data.emissions).toLocaleString()}</span> kg CO₂
           </p>
           {data.percentage && (
-            <p className="text-sm text-text-secondary dark:text-zinc-400">
-              {data.percentage.toFixed(1)}% of total
+            <p className="text-sm text-slate-300">
+              <span className="font-bold text-purple-400">{data.percentage.toFixed(1)}%</span> of total
             </p>
           )}
-          <p className="text-xs text-text-tertiary dark:text-zinc-500">
-            Mode: {data.mode}
+          <p className="text-xs text-slate-400 mt-1">
+            Mode: <span className="font-medium text-slate-300">{data.mode}</span>
           </p>
         </div>
       );
@@ -61,15 +61,15 @@ export function CarbonFootprintVisualization({
   };
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow-md dark:bg-zinc-800">
-      <h2 className="mb-4 text-lg font-semibold text-text-primary dark:text-zinc-50">
+    <div className="rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 p-6 shadow-lg">
+      <h2 className="mb-6 text-xl font-bold text-white">
         Carbon Footprint by Route
       </h2>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Pie Chart - Distribution */}
         <div>
-          <h3 className="mb-2 text-sm font-medium text-text-secondary dark:text-zinc-400">
+          <h3 className="mb-4 text-sm font-medium text-white">
             Emissions Distribution
           </h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -104,26 +104,27 @@ export function CarbonFootprintVisualization({
 
         {/* Bar Chart - Top Routes */}
         <div>
-          <h3 className="mb-2 text-sm font-medium text-text-secondary dark:text-zinc-400">
+          <h3 className="mb-2 text-sm font-medium text-white">
             Top 10 Routes by Emissions
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={barData} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <BarChart data={barData} layout="horizontal" margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.3} />
               <XAxis
                 type="number"
-                stroke="#9ca3af"
-                tick={{ fill: '#9ca3af', fontSize: 12 }}
+                stroke="#94a3b8"
+                tick={{ fill: '#cbd5e1', fontSize: 11 }}
+                label={{ value: 'Emissions (kg CO₂)', position: 'insideBottom', offset: -5, fill: '#94a3b8', fontSize: 11 }}
               />
               <YAxis
                 type="category"
                 dataKey="name"
-                stroke="#9ca3af"
-                tick={{ fill: '#9ca3af', fontSize: 10 }}
-                width={100}
+                stroke="#94a3b8"
+                tick={{ fill: '#cbd5e1', fontSize: 10 }}
+                width={120}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="emissions" fill="#3b82f6">
+              <Bar dataKey="emissions" radius={[0, 4, 4, 0]}>
                 {barData.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
@@ -137,11 +138,12 @@ export function CarbonFootprintVisualization({
       </div>
 
       {/* Transport Mode Legend */}
-      <div className="mt-4 flex flex-wrap gap-4">
+      <div className="mt-6 pt-4 border-t border-slate-800/50 flex flex-wrap gap-4">
+        <span className="text-sm font-medium text-slate-400 mr-2">Transport Modes:</span>
         {Object.entries(TRANSPORT_COLORS).map(([mode, color]) => (
           <div key={mode} className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }}></div>
-            <span className="text-sm text-text-secondary dark:text-zinc-400">{mode}</span>
+            <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: color }}></div>
+            <span className="text-sm text-slate-300 font-medium">{mode}</span>
           </div>
         ))}
       </div>

@@ -1,0 +1,14 @@
+{
+  "name": "Lint Frontend on Save",
+  "description": "Run ESLint on TypeScript/React files when saved",
+  "enabled": true,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "frontend/**/*.{ts,tsx}"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npm run lint -- ${filePath}",
+    "workingDirectory": "frontend"
+  }
+}

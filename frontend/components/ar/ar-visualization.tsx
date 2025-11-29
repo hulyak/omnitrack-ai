@@ -50,6 +50,8 @@ export function ARVisualization({
   // Detect AR capabilities on mount
   useEffect(() => {
     detectARCapabilities();
+    // Force 2D mode for better compatibility
+    setViewState((prev) => ({ ...prev, mode: '2D' }));
   }, []);
 
   const detectARCapabilities = useCallback(async () => {
@@ -174,7 +176,7 @@ export function ARVisualization({
   if (!capabilities) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">Detecting AR capabilities...</div>
+        <div className="text-slate-300 text-lg font-medium">Detecting AR capabilities...</div>
       </div>
     );
   }
@@ -182,33 +184,50 @@ export function ARVisualization({
   // Render 2D fallback view
   if (viewState.mode === '2D' || !capabilities.webGLSupported) {
     return (
-      <div className="relative w-full h-full bg-gray-900" ref={containerRef}>
-        <div className="absolute top-4 left-4 bg-yellow-500 text-black px-4 py-2 rounded">
-          AR not supported - showing 2D map view
+      <div className="relative w-full min-h-screen" ref={containerRef}>
+        <div className="mb-6 bg-yellow-500/90 backdrop-blur-sm text-black px-4 py-3 rounded-lg shadow-lg inline-flex items-center gap-2">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span className="font-medium">AR not supported - showing 2D map view</span>
         </div>
         
         {/* 2D Map View */}
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="grid grid-cols-3 gap-4 p-8">
+        <div className="w-full py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl w-full">
             {filteredNodes.map((node) => (
               <button
                 key={node.nodeId}
                 onClick={() => handleNodeClick(node)}
                 className={`
-                  p-4 rounded-lg border-2 transition-all
-                  ${selectedNode?.nodeId === node.nodeId ? 'border-blue-500 bg-blue-900' : 'border-gray-700 bg-gray-800'}
-                  ${disruptedNodeIds.has(node.nodeId) && viewState.filters.showDisruptions ? 'ring-2 ring-red-500' : ''}
-                  hover:border-blue-400
+                  p-6 rounded-xl border-2 transition-all duration-200 shadow-lg
+                  ${selectedNode?.nodeId === node.nodeId 
+                    ? 'border-purple-500 bg-purple-900/50 scale-105' 
+                    : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
+                  }
+                  ${disruptedNodeIds.has(node.nodeId) && viewState.filters.showDisruptions 
+                    ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-slate-900' 
+                    : ''
+                  }
+                  hover:border-purple-400 hover:scale-105
                 `}
               >
-                <div className="text-sm font-semibold text-white">{node.name}</div>
-                <div className="text-xs text-gray-400 mt-1">{node.type}</div>
+                <div className="text-base font-bold text-white mb-1">{node.name}</div>
+                <div className="text-xs text-slate-400 mb-3 uppercase tracking-wide">{node.type}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div className="text-slate-400">Capacity:</div>
+                  <div className="text-white font-medium">{node.metrics.capacity}</div>
+                  <div className="text-slate-400">Utilization:</div>
+                  <div className="text-white font-medium">{node.metrics.utilization}%</div>
+                  <div className="text-slate-400">Inventory:</div>
+                  <div className="text-white font-medium">{node.metrics.inventory}</div>
+                </div>
                 <div className={`
-                  text-xs mt-2 px-2 py-1 rounded
-                  ${node.status === 'HEALTHY' ? 'bg-green-600' : ''}
-                  ${node.status === 'DEGRADED' ? 'bg-yellow-600' : ''}
-                  ${node.status === 'DISRUPTED' ? 'bg-red-600' : ''}
-                  ${node.status === 'OFFLINE' ? 'bg-gray-600' : ''}
+                  text-xs px-3 py-1.5 rounded-lg font-semibold text-center
+                  ${node.status === 'HEALTHY' ? 'bg-green-600 text-white' : ''}
+                  ${node.status === 'DEGRADED' ? 'bg-yellow-600 text-white' : ''}
+                  ${node.status === 'DISRUPTED' ? 'bg-red-600 text-white' : ''}
+                  ${node.status === 'OFFLINE' ? 'bg-gray-600 text-white' : ''}
                 `}>
                   {node.status}
                 </div>
@@ -219,32 +238,52 @@ export function ARVisualization({
 
         {/* Node Details Panel */}
         {selectedNode && (
-          <div className="absolute top-4 right-4 bg-gray-800 border border-gray-700 rounded-lg p-4 w-80">
-            <h3 className="text-lg font-semibold text-white mb-2">{selectedNode.name}</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Type:</span>
-                <span className="text-white">{selectedNode.type}</span>
+          <div className="mt-6 bg-slate-800/95 backdrop-blur-xl border border-slate-700 rounded-xl p-6 max-w-2xl shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">{selectedNode.name}</h3>
+              <button 
+                onClick={() => setSelectedNode(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Type:</span>
+                <span className="text-white font-semibold">{selectedNode.type}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Status:</span>
-                <span className="text-white">{selectedNode.status}</span>
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Status:</span>
+                <span className={`font-semibold ${
+                  selectedNode.status === 'HEALTHY' ? 'text-green-400' :
+                  selectedNode.status === 'DEGRADED' ? 'text-yellow-400' :
+                  selectedNode.status === 'DISRUPTED' ? 'text-red-400' : 'text-gray-400'
+                }`}>{selectedNode.status}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Capacity:</span>
-                <span className="text-white">{selectedNode.metrics.capacity}</span>
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Capacity:</span>
+                <span className="text-white font-semibold">{selectedNode.metrics.capacity.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Utilization:</span>
-                <span className="text-white">{selectedNode.metrics.utilization}%</span>
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Utilization:</span>
+                <span className="text-white font-semibold">{selectedNode.metrics.utilization}%</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Inventory:</span>
-                <span className="text-white">{selectedNode.metrics.inventory}</span>
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Inventory:</span>
+                <span className="text-white font-semibold">{selectedNode.metrics.inventory.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Lead Time:</span>
-                <span className="text-white">{selectedNode.metrics.leadTime} days</span>
+              <div className="flex justify-between py-2 border-b border-slate-700">
+                <span className="text-slate-400 font-medium">Lead Time:</span>
+                <span className="text-white font-semibold">{selectedNode.metrics.leadTime} days</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-slate-400 font-medium">Location:</span>
+                <span className="text-white text-xs font-mono">
+                  {selectedNode.location.latitude.toFixed(2)}, {selectedNode.location.longitude.toFixed(2)}
+                </span>
               </div>
             </div>
           </div>

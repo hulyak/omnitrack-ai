@@ -19,7 +19,7 @@ export function VoiceCommandHistory({ history }: VoiceCommandHistoryProps) {
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
           <svg 
-            className="w-16 h-16 mx-auto text-gray-300 mb-4" 
+            className="w-16 h-16 mx-auto text-slate-400 mb-4" 
             fill="none" 
             stroke="currentColor" 
             viewBox="0 0 24 24"
@@ -31,8 +31,8 @@ export function VoiceCommandHistory({ history }: VoiceCommandHistoryProps) {
               d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" 
             />
           </svg>
-          <p className="text-gray-500 text-sm">No commands yet</p>
-          <p className="text-gray-400 text-xs mt-1">Start by speaking or typing a command</p>
+          <p className="text-slate-200 text-sm font-medium">No commands yet</p>
+          <p className="text-slate-400 text-xs mt-1">Start by speaking or typing a command</p>
         </div>
       </div>
     );
@@ -76,11 +76,11 @@ export function VoiceCommandHistory({ history }: VoiceCommandHistoryProps) {
   const getStatusColor = (status: VoiceCommandHistoryItem['status']) => {
     switch (status) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-900/20 border-green-500/50';
       case 'failed':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-900/20 border-red-500/50';
       case 'needs_clarification':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-900/20 border-yellow-500/50';
     }
   };
 
@@ -95,30 +95,30 @@ export function VoiceCommandHistory({ history }: VoiceCommandHistoryProps) {
 
   return (
     <div className="h-full overflow-y-auto p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3 px-2">Command History</h3>
+      <h3 className="text-sm font-semibold text-white mb-4 px-2">Command History</h3>
       <div className="space-y-3">
         {history.map((item) => (
           <div
             key={item.id}
-            className={`p-3 rounded-lg border ${getStatusColor(item.status)} transition-all hover:shadow-sm`}
+            className={`p-4 rounded-lg border ${getStatusColor(item.status)} transition-all hover:bg-slate-800/30`}
           >
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {getStatusIcon(item.status)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-500">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-slate-300">
                     {formatTime(item.timestamp)}
                   </span>
-                  <span className="text-xs text-gray-400 font-mono">
+                  <span className="text-xs text-slate-400 font-mono">
                     {item.intent}
                   </span>
                 </div>
-                <p className="text-sm text-gray-900 font-medium mb-1">
+                <p className="text-sm text-white font-medium mb-2">
                   {item.transcript}
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-300">
                   {item.response}
                 </p>
               </div>

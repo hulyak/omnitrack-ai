@@ -2,56 +2,129 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Demo data for scenario simulation
 const generateScenarioResults = (parameters: any) => {
-  const { scenarioType, severity, duration, affectedNodes } = parameters;
+  const { scenarioType, severity, duration } = parameters;
   
   // Simulate different scenario outcomes based on parameters
   const baseImpact = severity === 'high' ? 0.8 : severity === 'medium' ? 0.5 : 0.2;
   const durationMultiplier = duration > 30 ? 1.5 : duration > 14 ? 1.2 : 1.0;
   
+  const costImpact = Math.round(baseImpact * durationMultiplier * 2500000);
+  const delayDays = Math.round(baseImpact * durationMultiplier * 7);
+  const affectedOrders = Math.round(baseImpact * durationMultiplier * 1500);
+  
   return {
     scenarioId: `scenario_${Date.now()}`,
-    status: 'completed',
-    results: {
-      overallImpact: Math.min(baseImpact * durationMultiplier, 1.0),
-      affectedNodes: affectedNodes || ['shanghai', 'singapore'],
-      metrics: {
-        revenueImpact: {
-          amount: Math.round(baseImpact * durationMultiplier * 2500000),
-          currency: 'USD',
-          percentage: Math.round(baseImpact * durationMultiplier * 15)
-        },
-        deliveryDelay: {
-          averageDays: Math.round(baseImpact * durationMultiplier * 7),
-          maxDays: Math.round(baseImpact * durationMultiplier * 14)
-        },
-        customerSatisfaction: {
-          score: Math.max(85 - (baseImpact * durationMultiplier * 30), 40),
-          change: -Math.round(baseImpact * durationMultiplier * 30)
+    status: 'COMPLETED',
+    progress: 100,
+    summary: `The ${scenarioType.replace(/_/g, ' ')} scenario with ${severity} severity over ${duration} days would result in an estimated cost impact of $${costImpact.toLocaleString()}, affecting approximately ${affectedOrders.toLocaleString()} orders with an average delivery delay of ${delayDays} days. Our AI agents have analyzed multiple mitigation strategies to minimize the impact.`,
+    impacts: {
+      cost: {
+        value: costImpact,
+        currency: 'USD',
+        breakdown: {
+          direct: Math.round(costImpact * 0.4),
+          indirect: Math.round(costImpact * 0.35),
+          opportunity: Math.round(costImpact * 0.25)
         }
       },
-      mitigationStrategies: [
-        {
-          strategy: 'Alternative Supplier Activation',
-          effectiveness: Math.random() * 0.4 + 0.6,
-          cost: Math.round(Math.random() * 500000 + 100000),
-          timeToImplement: Math.round(Math.random() * 7 + 3)
-        },
-        {
-          strategy: 'Inventory Buffer Increase',
-          effectiveness: Math.random() * 0.3 + 0.5,
-          cost: Math.round(Math.random() * 300000 + 50000),
-          timeToImplement: Math.round(Math.random() * 3 + 1)
-        },
-        {
-          strategy: 'Route Optimization',
-          effectiveness: Math.random() * 0.5 + 0.4,
-          cost: Math.round(Math.random() * 100000 + 20000),
-          timeToImplement: Math.round(Math.random() * 5 + 2)
-        }
-      ],
-      timeline: generateTimeline(scenarioType, duration),
-      confidence: Math.random() * 0.2 + 0.8
+      deliveryTime: {
+        delayDays: delayDays,
+        affectedOrders: affectedOrders,
+        criticalOrders: Math.round(affectedOrders * 0.3)
+      },
+      inventory: {
+        shortfall: Math.round(baseImpact * durationMultiplier * 5000),
+        excessStock: Math.round(baseImpact * durationMultiplier * 2000),
+        affectedSKUs: Math.round(baseImpact * durationMultiplier * 45)
+      },
+      sustainability: {
+        carbonFootprint: Math.round(baseImpact * durationMultiplier * 15000),
+        emissionsIncrease: baseImpact * durationMultiplier * 12
+      }
     },
+    strategies: [
+      {
+        id: 'strategy-1',
+        title: 'Alternative Supplier Activation',
+        description: 'Activate pre-qualified backup suppliers to maintain supply continuity',
+        confidence: 0.85,
+        impact: {
+          costReduction: Math.round(costImpact * 0.45),
+          timeReduction: Math.round(delayDays * 0.6),
+          riskReduction: 0.7
+        }
+      },
+      {
+        id: 'strategy-2',
+        title: 'Expedited Shipping Routes',
+        description: 'Use air freight and express shipping to reduce delivery delays',
+        confidence: 0.78,
+        impact: {
+          costReduction: Math.round(costImpact * 0.3),
+          timeReduction: Math.round(delayDays * 0.8),
+          riskReduction: 0.5
+        }
+      },
+      {
+        id: 'strategy-3',
+        title: 'Inventory Buffer Increase',
+        description: 'Temporarily increase safety stock levels for critical SKUs',
+        confidence: 0.72,
+        impact: {
+          costReduction: Math.round(costImpact * 0.25),
+          timeReduction: Math.round(delayDays * 0.4),
+          riskReduction: 0.6
+        }
+      }
+    ],
+    decisionTree: {
+      id: 'root',
+      label: 'Scenario Analysis',
+      value: scenarioType.replace(/_/g, ' '),
+      confidence: 0.87,
+      children: [
+        {
+          id: 'impact',
+          label: 'Impact Assessment',
+          value: `${severity} severity`,
+          confidence: 0.92,
+          children: [
+            {
+              id: 'cost',
+              label: 'Cost Impact',
+              value: `$${costImpact.toLocaleString()}`,
+              confidence: 0.85
+            },
+            {
+              id: 'time',
+              label: 'Time Impact',
+              value: `${delayDays} days delay`,
+              confidence: 0.88
+            }
+          ]
+        },
+        {
+          id: 'mitigation',
+          label: 'Mitigation Options',
+          confidence: 0.83,
+          children: [
+            {
+              id: 'supplier',
+              label: 'Alternative Suppliers',
+              value: 'Recommended',
+              confidence: 0.85
+            },
+            {
+              id: 'shipping',
+              label: 'Expedited Shipping',
+              value: 'High Cost',
+              confidence: 0.78
+            }
+          ]
+        }
+      ]
+    },
+    executionTime: 1500 + Math.random() * 1000,
     createdAt: new Date().toISOString(),
     parameters
   };

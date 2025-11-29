@@ -1,0 +1,14 @@
+{
+  "name": "Type Check on Save",
+  "description": "Run TypeScript type checking when TypeScript files are saved",
+  "enabled": true,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/*.{ts,tsx}"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npx tsc --noEmit --project tsconfig.json",
+    "workingDirectory": "frontend"
+  }
+}

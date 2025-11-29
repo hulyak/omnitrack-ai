@@ -1,0 +1,13 @@
+{
+  "name": "Accessibility Check",
+  "description": "Check WCAG compliance when React components are saved",
+  "enabled": false,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "frontend/components/**/*.tsx"
+  },
+  "action": {
+    "type": "sendMessage",
+    "message": "Review the accessibility of this component. Check for:\n- Proper ARIA labels\n- Keyboard navigation support\n- Color contrast ratios (WCAG AA: 4.5:1 for text, 3:1 for UI)\n- Focus indicators\n- Screen reader compatibility\n\nFile: ${filePath}"
+  }
+}

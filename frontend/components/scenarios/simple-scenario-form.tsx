@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
@@ -48,21 +47,21 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="scenarioType" className="text-slate-700 font-medium">Scenario Type</Label>
+        <Label htmlFor="scenarioType" className="text-white font-medium">Scenario Type</Label>
         <Select 
           value={parameters.scenarioType} 
           onValueChange={(value: string) => setParameters(prev => ({ ...prev, scenarioType: value }))}
           disabled={disabled}
         >
-          <SelectTrigger className="bg-white border-slate-300 text-slate-900">
-            <SelectValue placeholder="Select a scenario type" />
+          <SelectTrigger className="bg-slate-800/50 border-slate-600 text-white [&>span]:text-white">
+            <SelectValue placeholder="Select a scenario type" className="text-white" />
           </SelectTrigger>
           <SelectContent>
             {scenarioTypes.map((type) => (
-              <SelectItem key={type.id} value={type.id}>
+              <SelectItem key={type.id} value={type.id} className="text-slate-900">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-900">{type.name}</span>
-                  <Badge variant="outline" className="text-xs border-slate-300 text-slate-600">
+                  <span>{type.name}</span>
+                  <Badge variant="outline" className="text-xs border-slate-400 text-slate-700">
                     {type.category}
                   </Badge>
                 </div>
@@ -71,14 +70,14 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
           </SelectContent>
         </Select>
         {selectedScenarioType && (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-300">
             {selectedScenarioType.description}
           </p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="severity" className="text-slate-700 font-medium">Severity Level</Label>
+        <Label htmlFor="severity" className="text-white font-medium">Severity Level</Label>
         <div className="grid grid-cols-3 gap-2">
           {['low', 'medium', 'high'].map((level) => (
             <button
@@ -89,7 +88,7 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 parameters.severity === level
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                  : 'bg-slate-800/50 text-slate-200 border border-slate-600 hover:bg-slate-700/50'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -102,7 +101,7 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
       </div>
 
       <div className="space-y-2">
-        <Label className="text-slate-700 font-medium">Duration: {parameters.duration} days</Label>
+        <Label className="text-white font-medium">Duration: {parameters.duration} days</Label>
         <Slider
           value={[parameters.duration]}
           onValueChange={(value: number[]) => setParameters(prev => ({ ...prev, duration: value[0] }))}
@@ -112,14 +111,14 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
           disabled={disabled}
           className="w-full"
         />
-        <div className="flex justify-between text-sm text-slate-500">
+        <div className="flex justify-between text-sm text-slate-300 font-medium">
           <span>1 day</span>
           <span>90 days</span>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="description" className="text-slate-700 font-medium">Additional Notes</Label>
+        <Label htmlFor="description" className="text-white font-medium">Additional Notes</Label>
         <textarea
           id="description"
           placeholder="Describe any specific conditions or assumptions for this scenario..."
@@ -127,7 +126,7 @@ export function SimpleScenarioForm({ onSubmit, disabled = false, scenarioTypes =
           onChange={(e) => setParameters(prev => ({ ...prev, description: e.target.value }))}
           disabled={disabled}
           rows={3}
-          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 border border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-800/50 text-white placeholder:text-slate-400 disabled:bg-slate-900/50 disabled:cursor-not-allowed"
         />
       </div>
 
