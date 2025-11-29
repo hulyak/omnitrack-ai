@@ -1,1 +1,0 @@
-# Kiro AI Assistant Configuration
