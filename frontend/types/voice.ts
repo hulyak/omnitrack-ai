@@ -23,6 +23,7 @@ export interface VoiceCommandResult {
   requiresClarification: boolean;
   clarificationPrompt?: string;
   executionStatus: 'success' | 'failed' | 'needs_clarification';
+  executionTime?: number;
 }
 
 export interface VoiceCommandHistoryItem {
