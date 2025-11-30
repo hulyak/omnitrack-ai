@@ -15,6 +15,10 @@ function DashboardContent() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [demoMode, setDemoMode] = useState(false);
+  const [agentResults, setAgentResults] = useState<any>(null);
+  const [currentAgent, setCurrentAgent] = useState<string>('');
+  const [supplyChainConfig, setSupplyChainConfig] = useState<SupplyChainConfig | undefined>();
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -23,24 +27,7 @@ function DashboardContent() {
     }
   }, [status, router]);
 
-  // Show loading state
-  if (status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
-        <div className="text-white text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  // Don't render if not authenticated
-  if (status === 'unauthenticated') {
-    return null;
-  }
-  const [agentResults, setAgentResults] = useState<any>(null);
-  const [currentAgent, setCurrentAgent] = useState<string>('');
-  const [supplyChainConfig, setSupplyChainConfig] = useState<SupplyChainConfig | undefined>();
-  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-
+  // Load demo mode and config
   useEffect(() => {
     // Check if in demo mode
     const isDemoMode = localStorage.getItem('demoMode') === 'true';
@@ -56,6 +43,20 @@ function DashboardContent() {
       })
       .catch(err => console.error('Failed to load config:', err));
   }, []);
+
+  // Show loading state
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (status === 'unauthenticated') {
+    return null;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('demoMode');
