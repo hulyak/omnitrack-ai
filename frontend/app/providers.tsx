@@ -1,12 +1,12 @@
 'use client';
 
-import { AuthProvider } from '@/lib/auth/auth-context';
+import { SessionProvider } from '@/components/providers/session-provider';
 import { ReactNode } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
+    <SessionProvider>
       {children}
-    </AuthProvider>
+    </SessionProvider>
   );
 }

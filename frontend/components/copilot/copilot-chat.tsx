@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
+import { useSession } from 'next-auth/react';
 import { X, Minimize2, Maximize2, WifiOff, Wifi, Sparkles } from 'lucide-react';
 import { CopilotChatProps, Message } from '@/types/copilot';
 import { MessageList } from './message-list';
 import { CopilotInput } from './copilot-input';
 import { SuggestedPrompts } from './suggested-prompts';
 import { useCopilotWebSocket } from '@/lib/websocket/copilot-websocket-hook';
-import { useAuth } from '@/lib/auth/auth-context';
 
 /**
  * CopilotChat - Main container component for the AI Copilot interface
@@ -22,7 +22,7 @@ import { useAuth } from '@/lib/auth/auth-context';
  * Requirements: 1.1, 2.1, 2.2, 8.1
  */
 export function CopilotChat({ isOpen, onClose, supplyChainContext }: CopilotChatProps) {
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const [isMinimized, setIsMinimized] = useState(false);
   const [demoMode, setDemoMode] = useState(true); // Always use demo mode for now
   const [demoMessages, setDemoMessages] = useState<Message[]>([]);
@@ -43,7 +43,7 @@ export function CopilotChat({ isOpen, onClose, supplyChainContext }: CopilotChat
     error: wsError,
     conversationId,
   } = useCopilotWebSocket({
-    userId: user?.id || 'anonymous',
+    userId: session?.user?.id || 'anonymous',
     autoConnect: false, // Disabled for demo mode
     reconnectAttempts: 5,
     reconnectDelay: 1000,

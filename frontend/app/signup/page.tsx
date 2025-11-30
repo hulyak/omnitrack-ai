@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Github } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,7 +19,6 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!email || !password || !confirmPassword || !name) {
       setError('All fields are required');
       return;
@@ -36,22 +37,17 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
+      // Sign up using credentials provider (demo mode)
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
+      if (result?.error) {
+        throw new Error('Signup failed');
       }
 
-      // Store token and redirect to dashboard
-      localStorage.setItem('auth_token', data.token);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed. Please try again.');
@@ -60,9 +56,34 @@ export default function SignupPage() {
     }
   };
 
-  const handleDemoMode = () => {
-    localStorage.setItem('demoMode', 'true');
-    router.push('/dashboard');
+  const handleGithubSignIn = async () => {
+    setLoading(true);
+    try {
+      await signIn('github', { callbackUrl: '/dashboard' });
+    } catch (err) {
+      setError('GitHub sign in failed');
+      setLoading(false);
+    }
+  };
+
+  const handleDemoMode = async () => {
+    setLoading(true);
+    try {
+      const result = await signIn('credentials', {
+        email: 'demo@omnitrack.ai',
+        password: 'demo',
+        redirect: false,
+      });
+
+      if (result?.error) {
+        throw new Error('Demo mode failed');
+      }
+
+      router.push('/dashboard');
+    } catch (err) {
+      setError('Demo mode failed');
+      setLoading(false);
+    }
   };
 
   return (
@@ -173,17 +194,38 @@ export default function SignupPage() {
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/50 text-slate-400">or</span>
+              <span className="px-4 bg-slate-900/50 text-slate-400">or continue with</span>
             </div>
           </div>
 
-          {/* Demo Mode Button */}
-          <button
-            onClick={handleDemoMode}
-            className="w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/50 text-purple-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200"
-          >
-            Try Demo Mode
-          </button>
+          {/* OAuth & Demo Buttons */}
+          <div className="space-y-3">
+            {/* GitHub OAuth temporarily disabled
+            <button
+              onClick={handleGithubSignIn}
+              disabled={loading}
+              className="w-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 text-slate-200 font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <Github className="w-5 h-5" />
+                Sign up with GitHub
+              </span>
+            </button>
+            */}
+
+            <button
+              onClick={handleDemoMode}
+              disabled={loading}
+              className="w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/50 text-purple-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Try Demo Mode
+              </span>
+            </button>
+          </div>
 
           {/* Login Link */}
           <p className="text-center text-slate-400 text-sm mt-6">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { useAuth } from '../auth/auth-context';
+import { useSession } from 'next-auth/react';
 
 type WebSocketMessage = {
   type: 'digital_twin_update' | 'alert_notification' | 'scenario_progress' | 'agent_status';
@@ -20,7 +20,8 @@ interface WebSocketContextType {
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());

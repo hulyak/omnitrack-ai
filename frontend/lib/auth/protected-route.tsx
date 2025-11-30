@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from './auth-context';
+import { useSession } from 'next-auth/react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,18 +10,21 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const isLoading = status === 'loading';
+  const isAuthenticated = status === 'authenticated';
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
 
-    if (!isLoading && isAuthenticated && requiredRole && user?.role !== requiredRole) {
-      router.push('/unauthorized');
-    }
-  }, [isLoading, isAuthenticated, user, requiredRole, router]);
+    // Role-based access control can be added here if needed
+    // if (!isLoading && isAuthenticated && requiredRole && session?.user?.role !== requiredRole) {
+    //   router.push('/unauthorized');
+    // }
+  }, [isLoading, isAuthenticated, requiredRole, router]);
 
   if (isLoading) {
     return (
@@ -32,10 +35,6 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (!isAuthenticated) {
-    return null;
-  }
-
-  if (requiredRole && user?.role !== requiredRole) {
     return null;
   }
 

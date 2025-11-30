@@ -54,3 +54,4 @@ samconfig.toml
 
 # Archived development files
 .archive/
+.vercel
