@@ -43,7 +43,7 @@ export function CopilotChat({ isOpen, onClose, supplyChainContext }: CopilotChat
     error: wsError,
     conversationId,
   } = useCopilotWebSocket({
-    userId: session?.user?.id || 'anonymous',
+    userId: (session?.user as any)?.id || session?.user?.email || 'anonymous',
     autoConnect: false, // Disabled for demo mode
     reconnectAttempts: 5,
     reconnectDelay: 1000,
