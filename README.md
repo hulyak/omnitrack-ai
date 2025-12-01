@@ -10,7 +10,7 @@ OmniTrack AI is an autonomous multi-agent system that transforms supply chain ma
 
 Supply chain disruptions cost businesses $4 trillion annually. Companies take 3-7 days to detect problems and another 2-5 days to respond. By then, the damage has cascaded through their entire network.
 
-### Our Solution
+### The Solution
 
 Four AI agents collaborate autonomously:
 
@@ -37,8 +37,8 @@ Four AI agents collaborate autonomously:
 ## 🎬 Quick Demo (30 Seconds)
 
 ```bash
-# 1. Start submission prep (verifies everything)
-./start-submission-prep.sh
+# 1. Verify setup
+./verify-setup.sh
 
 # 2. Launch the application
 cd frontend && npm run dev
@@ -88,12 +88,12 @@ This project demonstrates Kiro's complete development workflow:
 
 | Metric | Count |
 |--------|-------|
-| TypeScript Files | 200+ |
-| Lines of Code | 15,000+ |
-| Lambda Functions | 22+ |
+| Lines of Code | 17,500+ |
+| Lambda Functions | 22 |
 | React Components | 50+ |
 | AWS Services | 15+ |
-| Spec Documents | 6 |
+| Infrastructure Code | 2,000+ lines |
+| Functional Pages | 8 |
 
 ---
 
@@ -119,17 +119,15 @@ This project demonstrates Kiro's complete development workflow:
 ### For Hackathon Judges
 
 **See the complete submission package**:
-- 📖 **Master Checklist**: `HACKATHON_SUBMISSION_MASTER_CHECKLIST.md`
-- 📸 **Screenshot Guide**: `SCREENSHOT_CAPTURE_GUIDE.md`
+- 📝 **Submission**: `HACKATHON_SUBMISSION_SHORT.md`
 - 🎬 **Video Script**: `VIDEO_SCRIPT_DETAILED.md`
-- 🚀 **Deployment Proof**: `DEPLOYMENT_READINESS_PROOF.md`
-- 📝 **Kiro Usage**: `KIRO_USAGE_DOCUMENTATION.md`
+- 🚀 **Quick Start**: `START_HERE_HACKATHON.md`
 
 ### Quick Local Demo
 
 ```bash
-# Install and verify
-./start-submission-prep.sh
+# Verify setup
+./verify-setup.sh
 
 # Start frontend
 cd frontend
@@ -210,11 +208,12 @@ OmniTrack AI is built on AWS infrastructure with:
 
 ## Documentation
 
-Detailed documentation is available in the `.kiro/specs/omnitrack-ai-supply-chain/` directory:
-- `requirements.md` - Feature requirements and acceptance criteria
-- `design.md` - System architecture and design decisions
-- `tasks.md` - Implementation plan and task list
+### Kiro Development Workflow
+- `.kiro/specs/` - Spec-driven development (requirements, design, tasks)
+- `.kiro/steering/` - Agent steering conventions and standards
+- `.kiro/hooks/` - Automated quality checks and validation
+
 
 ## License
 
-Proprietary - All rights reserved
+MIT License - See [LICENSE](LICENSE) file for details
