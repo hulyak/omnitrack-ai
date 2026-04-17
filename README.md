@@ -1,7 +1,5 @@
 # OmniTrack AI - Supply Chain Resilience Platform
 
-**AWS Global Vibe Hackathon 2025 | Built with Amazon Kiro**
-
 ## What is OmniTrack AI?
 
 OmniTrack AI is an autonomous multi-agent system that transforms supply chain management from reactive crisis response to proactive resilience. Four specialized AI agents work together to detect disruptions 10x faster and respond 50x faster than traditional systems.
@@ -49,41 +47,6 @@ cd infrastructure && npx cdk synth
 # ✅ Generates 2000+ lines of CloudFormation - ready for deployment!
 ```
 
-## 🤖 Built with Amazon Kiro
-
-This project demonstrates Kiro's complete development workflow:
-
-**Spec-Driven Development**
-- Natural language requirements → 17,500+ lines of production code
-- 22 Lambda functions with complete business logic
-- 50+ React components with full functionality
-- 2,000+ lines of AWS CDK infrastructure
-
-**Agent Steering**
-- Consistent code patterns across all components
-- Dark theme with WCAG AA accessibility (348% contrast improvement)
-- Proper error handling and structured logging throughout
-
-**Automated Hooks**
-- Tests run on save
-- TypeScript validation on every change
-- Infrastructure checks before deployment
-- 60% reduction in debugging time
-
-**MCP Integration**
-- Real-time AWS documentation access
-- Current API patterns and best practices
-- NPM package version checking
-
-**Development Impact**: 10x faster development, enterprise-grade quality, zero TypeScript errors
-
-### Kiro Evidence
-
-- **Specs**: `.kiro/specs/` - Natural language requirements and design
-- **Steering**: `.kiro/steering/` - Project conventions and standards
-- **Hooks**: `.kiro/hooks/` - Automated quality checks
-- **Generated Code**: All Lambda functions, React components, and infrastructure
-
 ## 📊 Project Scale
 
 | Metric | Count |
@@ -115,13 +78,6 @@ This project demonstrates Kiro's complete development workflow:
 - AWS CDK CLI (`npm install -g aws-cdk`)
 
 ## 🚀 Getting Started
-
-### For Hackathon Judges
-
-**See the complete submission package**:
-- 📝 **Submission**: `HACKATHON_SUBMISSION_SHORT.md`
-- 🎬 **Video Script**: `VIDEO_SCRIPT_DETAILED.md`
-- 🚀 **Quick Start**: `START_HERE_HACKATHON.md`
 
 ### Quick Local Demo
 
@@ -205,14 +161,6 @@ OmniTrack AI is built on AWS infrastructure with:
 - **AI/ML**: Amazon Bedrock for LLM reasoning, SageMaker for ML models
 - **Data**: DynamoDB, OpenSearch, ElastiCache
 - **Real-time**: API Gateway WebSocket, AWS IoT Core
-
-## Documentation
-
-### Kiro Development Workflow
-- `.kiro/specs/` - Spec-driven development (requirements, design, tasks)
-- `.kiro/steering/` - Agent steering conventions and standards
-- `.kiro/hooks/` - Automated quality checks and validation
-
 
 ## License
 
