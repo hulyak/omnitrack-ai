@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { MessageSquare } from 'lucide-react';
 import { AgentControls } from '@/components/dashboard/agent-controls';
 import { SupplyChainNetwork } from '@/components/dashboard/supply-chain-network';
@@ -58,9 +58,9 @@ function DashboardContent() {
     return null;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('demoMode');
-    router.push('/');
+    await signOut({ callbackUrl: '/' });
   };
 
   const handleConfigSubmit = async (config: SupplyChainConfig) => {

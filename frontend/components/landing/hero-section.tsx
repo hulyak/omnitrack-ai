@@ -153,6 +153,28 @@ export function HeroSection({ onGetStarted, onTryDemo, onShowAgents }: HeroSecti
           </button>
         </div>
 
+        {/* Quick Links */}
+        <div className="mt-8 flex items-center gap-6 text-sm">
+          <a href="/voice" className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            Try Voice Commands
+          </a>
+          <a href="/ar" className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            AR View
+          </a>
+          <a href="/marketplace" className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Marketplace
+          </a>
+        </div>
+
         {/* Scroll Indicator */}
         <div className="animate-bounce mt-12">
           <svg className="w-6 h-6 mx-auto text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

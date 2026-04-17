@@ -52,6 +52,9 @@ cdk.out/
 .aws-sam/
 samconfig.toml
 
+# TestSprite working files (contains API keys and large logs)
+testsprite_tests/tmp/
+
 # Archived development files
 .archive/
 .vercel

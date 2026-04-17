@@ -185,15 +185,48 @@ export function ARVisualization({
   if (viewState.mode === '2D' || !capabilities.webGLSupported) {
     return (
       <div className="relative w-full min-h-screen" ref={containerRef}>
-        <div className="mb-6 bg-yellow-500/90 backdrop-blur-sm text-black px-4 py-3 rounded-lg shadow-lg inline-flex items-center gap-2">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          <span className="font-medium">AR not supported - showing 2D map view</span>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="bg-yellow-500/90 backdrop-blur-sm text-black px-4 py-3 rounded-lg shadow-lg inline-flex items-center gap-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">AR not supported - showing 2D map view</span>
+          </div>
+
+          {/* Exploration Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleZoom(0.2)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-600 text-sm font-medium transition-all"
+            >
+              Zoom In +
+            </button>
+            <button
+              onClick={() => handleZoom(-0.2)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-600 text-sm font-medium transition-all"
+            >
+              Zoom Out -
+            </button>
+            <button
+              onClick={() => setViewState(prev => ({ ...prev, camera: { ...prev.camera, zoom: 1, rotation: { x: -0.5, y: 0, z: 0 } } }))}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-600 text-sm font-medium transition-all"
+            >
+              Reset View
+            </button>
+            <label className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-lg border border-slate-600 text-sm text-white">
+              <input
+                type="checkbox"
+                checked={viewState.filters.showDisruptions}
+                onChange={(e) => handleFilterChange({ showDisruptions: e.target.checked })}
+                className="rounded"
+              />
+              Disruptions
+            </label>
+          </div>
         </div>
-        
+
         {/* 2D Map View */}
-        <div className="w-full py-8">
+        <div className="w-full py-8" style={{ transform: `scale(${viewState.camera.zoom})`, transformOrigin: 'top center', transition: 'transform 0.2s' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl w-full">
             {filteredNodes.map((node) => (
               <button

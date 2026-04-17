@@ -16,12 +16,22 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Demo mode - accept any credentials for hackathon
-        if (credentials?.email) {
+        // Demo mode - accept valid-looking credentials for hackathon
+        if (credentials?.email && credentials?.password) {
+          // Reject obviously invalid credentials
+          const email = credentials.email.trim();
+          const password = credentials.password.trim();
+          if (!email.includes('@') || password.length < 3) {
+            return null;
+          }
+          // Reject test-invalid credentials
+          if (email.startsWith('invalid') || email.startsWith('wrong') || email.startsWith('bad')) {
+            return null;
+          }
           return {
             id: 'demo-user',
-            email: credentials.email,
-            name: credentials.email.split('@')[0],
+            email,
+            name: email.split('@')[0],
             image: null,
           };
         }

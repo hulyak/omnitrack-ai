@@ -21,7 +21,7 @@ export function SustainabilityDashboard({
   error,
   onRefresh,
 }: SustainabilityDashboardProps) {
-  const [timePeriod, setTimePeriod] = useState<'7d' | '30d' | '90d'>('30d');
+  const [timePeriod, setTimePeriod] = useState<'7d' | '30d' | '90d'>('90d');
 
   if (isLoading) {
     return (
@@ -113,7 +113,7 @@ export function SustainabilityDashboard({
       )}
 
       {/* Environmental Metrics */}
-      <EnvironmentalMetricsDisplay metrics={data.metrics} />
+      <EnvironmentalMetricsDisplay metrics={data.metrics} timePeriod={timePeriod} />
 
       {/* Carbon Footprint Visualization */}
       <CarbonFootprintVisualization

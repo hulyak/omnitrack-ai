@@ -20,6 +20,7 @@ export function CommandCenter() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [riskIntensity, setRiskIntensity] = useState(50);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
+  const [selectedScenario, setSelectedScenario] = useState('typhoon-disruption');
 
   const [metrics, setMetrics] = useState<Metric[]>([
     {
@@ -203,6 +204,24 @@ export function CommandCenter() {
 
             {/* Sliders */}
             <div className="flex-1 max-w-2xl space-y-6">
+              {/* Scenario Selector */}
+              <div>
+                <div className="flex justify-between mb-2">
+                  <label className="text-white font-semibold">Scenario</label>
+                </div>
+                <select
+                  value={selectedScenario}
+                  onChange={(e) => setSelectedScenario(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="typhoon-disruption">Typhoon Season - Taiwan Semiconductor</option>
+                  <option value="supplier-failure">Supplier Failure - Electronics</option>
+                  <option value="port-congestion">Port Congestion - Shanghai</option>
+                  <option value="demand-surge">Demand Surge - Holiday Season</option>
+                  <option value="cyber-attack">Cyber Attack - Logistics Network</option>
+                </select>
+              </div>
+
               {/* Risk Intensity */}
               <div>
                 <div className="flex justify-between mb-2">

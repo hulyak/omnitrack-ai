@@ -1,0 +1,999 @@
+[
+  {
+    "id": "TC001",
+    "title": "Dashboard loads nodes and starts live telemetry",
+    "description": "Verifies an authenticated user can open the dashboard and see nodes rendered with live telemetry and alerts visible.",
+    "category": "Supply Chain Dashboard (Real-time)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the dashboard to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify supply chain nodes are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify live telemetry and risk alerts are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Sign up, log in, and land on dashboard",
+    "description": "Verifies a new user can sign up and then log in to reach the authenticated dashboard successfully.",
+    "category": "Authentication & Session Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /signup"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique email into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the signup form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with the same newly registered email"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with the same newly registered password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Log in as existing user",
+    "description": "Verifies an existing user can log in and access authenticated content successfully.",
+    "category": "Authentication & Session Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Explainability analysis renders decision explanation from a valid decision",
+    "description": "Users can submit a decision for analysis and see decision tree, contributions, and confidence visualizations rendered.",
+    "category": "Explainability & Decision Transparency",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Run the disruption-response workflow until a decision identifier is available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /explainability"
+      },
+      {
+        "type": "action",
+        "description": "Select the newly created decision for analysis"
+      },
+      {
+        "type": "action",
+        "description": "Submit the explainability analysis request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an explainability visualization is displayed including decision structure and confidence information"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Open alert details from the dashboard",
+    "description": "Verifies an authenticated user can open a risk alert from the dashboard and view its details for triage.",
+    "category": "Supply Chain Dashboard (Real-time)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the dashboard to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Open an alert from the alerts list or alert panel"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the selected alert details are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Browse marketplace scenarios with industry filter and rating sort",
+    "description": "Users can filter marketplace scenarios by industry and sort by rating and see an updated list of matching scenarios.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Select an industry filter value"
+      },
+      {
+        "type": "action",
+        "description": "Select sorting by rating"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a list of scenarios is displayed and reflects the selected filter and sort order"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Open a scenario detail from marketplace listing",
+    "description": "Users can open a scenario from the marketplace list and view its detail page content.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Click a scenario in the list to open its detail view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the scenario detail view is displayed with scenario information"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Reject invalid credentials on login",
+    "description": "Verifies a user entering invalid login credentials is kept signed out and shown an authentication error.",
+    "category": "Authentication & Session Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with invalid-user@example.com"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with wrong-password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an authentication error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user remains on the login page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Sustainability dashboard shows aggregated KPIs and trends",
+    "description": "Users can load sustainability KPIs derived from nodes and analytics and see trends and alerts displayed.",
+    "category": "Sustainability Tracking",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /sustainability"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sustainability KPI summaries are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sustainability trends or alerts are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Log out ends the session",
+    "description": "Verifies a logged-in user can log out and is returned to a signed-out state.",
+    "category": "Authentication & Session Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the user account menu"
+      },
+      {
+        "type": "action",
+        "description": "Log out"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is in a signed-out state"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC011",
+    "title": "Load interactive demo with demo scenarios and config",
+    "description": "Verifies a visitor can load the landing page interactive demo and see the command center demo rendered after demo scenarios and config are loaded.",
+    "category": "Landing Page / Interactive Demo",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the interactive demo area to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify demo scenario options are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the interactive command center demo is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC012",
+    "title": "Use search to narrow marketplace results",
+    "description": "Users can search within the marketplace and see results narrowed to scenarios matching the query.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Factory disruption\" into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Press Enter"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the scenarios list updates to show fewer or equal results than before the search"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC013",
+    "title": "Trigger an operational request via voice command and see results",
+    "description": "Verifies a user can submit a voice command and the UI shows a resolved intent followed by an agent-backed result or action confirmation.",
+    "category": "Voice Interface",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the voice interface page"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid sample voice input option available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Submit the voice command for processing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows the recognized transcription and resolved intent details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows an agent result or action confirmation related to the intent"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC014",
+    "title": "View AR topology after nodes and spatial configuration load",
+    "description": "Verifies the AR view loads supply chain nodes and rendering configuration and displays an AR scene with node overlays.",
+    "category": "AR Visualization",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the AR visualization page"
+      },
+      {
+        "type": "action",
+        "description": "Start or enter the AR visualization experience from within the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an AR scene is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify node overlays or topology elements are visible in the AR view"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC015",
+    "title": "Explainability allows re-analyzing a decision after changing context inputs",
+    "description": "Users can adjust analysis context and re-run explainability to update the displayed explanation.",
+    "category": "Explainability & Decision Transparency",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Run the disruption-response workflow until a decision identifier is available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /explainability"
+      },
+      {
+        "type": "action",
+        "description": "Select the newly created decision for analysis"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid value into an available analysis context field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the explainability analysis request"
+      },
+      {
+        "type": "action",
+        "description": "Update the analysis context field to a different valid value"
+      },
+      {
+        "type": "action",
+        "description": "Submit the explainability analysis request again"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the explainability visualization refreshes to reflect the new analysis run"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC016",
+    "title": "Sustainability dashboard supports switching KPI scope or time range",
+    "description": "Users can change the KPI scope or time range and see sustainability KPIs update accordingly.",
+    "category": "Sustainability Tracking",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /sustainability"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Select a different time range or scope option"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the displayed sustainability KPIs update after the selection change"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC017",
+    "title": "Clear marketplace filters and return to full results",
+    "description": "Users can clear applied marketplace filters and see the broader scenario list return.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Select an industry filter value"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Clear all filters"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the scenarios list is displayed without the previously applied filter constraints"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC018",
+    "title": "Switch demo scenario in interactive demo",
+    "description": "Verifies a visitor can change the selected demo scenario and the demo visualization updates accordingly.",
+    "category": "Landing Page / Interactive Demo",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the interactive demo area to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Select a different demo scenario from the scenario selector"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the demo visualization updates to reflect the newly selected scenario"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC019",
+    "title": "Edit a typed command and see intent and results reflect the change",
+    "description": "Verifies a user can switch to typed command entry, modify the command, and see updated intent and corresponding results.",
+    "category": "Voice Interface",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the voice interface page"
+      },
+      {
+        "type": "action",
+        "description": "Switch to typed command entry mode"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid command into the typed command field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the typed command for processing"
+      },
+      {
+        "type": "action",
+        "description": "Edit the typed command to a different valid command"
+      },
+      {
+        "type": "action",
+        "description": "Submit the updated typed command for processing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows intent details consistent with the updated command"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows results consistent with the updated command"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC020",
+    "title": "Explainability rejects unknown decision identifier",
+    "description": "Users who provide an unknown decision identifier are prompted to select a valid decision or re-run analysis.",
+    "category": "Explainability & Decision Transparency",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /explainability"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"unknown-decision-id-000\" into the decision identifier field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the explainability analysis request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an invalid decision prompt is displayed and the user is guided to choose a valid decision or rerun the workflow"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC021",
+    "title": "Adjust demo configuration controls",
+    "description": "Verifies a visitor can adjust demo configuration controls and see the demo visualization respond to the new configuration.",
+    "category": "Landing Page / Interactive Demo",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the interactive demo area to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Adjust a demo configuration control to a different valid value"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the demo visualization reflects the updated configuration"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Marketplace sorting change updates displayed order",
+    "description": "Users can change the sort option and see the scenario list order update accordingly.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Select a sort option"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Select a different sort option"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the scenario list order changes after the second sort selection"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC023",
+    "title": "Sustainability dashboard handles empty or partial emissions data gracefully",
+    "description": "When some nodes lack emissions attributes, the sustainability dashboard still renders KPIs or shows a clear partial-data state.",
+    "category": "Sustainability Tracking",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /sustainability"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the dashboard renders without blocking and shows KPIs or a partial-data notice"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC024",
+    "title": "Re-run the same voice command and see the latest result update",
+    "description": "Verifies a user can re-submit a voice command and the UI updates to show the latest transcription/intent and latest result.",
+    "category": "Voice Interface",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the voice interface page"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid sample voice input option available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Submit the voice command for processing"
+      },
+      {
+        "type": "action",
+        "description": "Submit the same voice command again"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows the most recent transcription/intent as the current command"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI shows a single current result state for the latest command"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC025",
+    "title": "AR view supports basic exploration controls",
+    "description": "Verifies a user can use in-page AR exploration controls and the AR scene responds without losing rendered topology.",
+    "category": "AR Visualization",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the AR visualization page"
+      },
+      {
+        "type": "action",
+        "description": "Start or enter the AR visualization experience from within the page"
+      },
+      {
+        "type": "action",
+        "description": "Use an available in-page control to change the AR view (for example zoom, reset, or view mode)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the AR scene updates in response to the control interaction"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify node overlays remain visible after the interaction"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC026",
+    "title": "Sustainability dashboard provides a refresh action to reload KPIs",
+    "description": "Users can manually refresh sustainability KPIs and see the dashboard reload successfully.",
+    "category": "Sustainability Tracking",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /sustainability"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Click the refresh action for sustainability data"
+      },
+      {
+        "type": "action",
+        "description": "Wait for sustainability data to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sustainability KPI summaries are displayed after refresh"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC027",
+    "title": "Navigate from landing page to sign up entry point",
+    "description": "Verifies a visitor can start the onboarding journey by navigating from the landing page to the signup page.",
+    "category": "Landing Page / Interactive Demo",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click the call-to-action to create an account"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the signup page"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC028",
+    "title": "Marketplace empty results state for restrictive filters",
+    "description": "Users see an empty state when filters/search yield no matching scenarios and can recover by clearing criteria.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"zzzz-nonexistent-scenario-query\" into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Press Enter"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the scenarios list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty results state is displayed"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC029",
+    "title": "Handle invalid voice input by prompting for retry or typed command",
+    "description": "Verifies submitting invalid voice input results in a retry prompt or an option to type a command instead.",
+    "category": "Voice Interface",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the voice interface page"
+      },
+      {
+        "type": "action",
+        "description": "Select an invalid or noisy sample voice input option available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Submit the voice command for processing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a transcription/voice input validation error is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI prompts the user to retry or offers a typed command alternative"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC030",
+    "title": "Handle marketplace rate-limit state with user retry",
+    "description": "When the marketplace is rate-limited, the UI shows a rate-limit state and allows the user to retry loading results.",
+    "category": "Marketplace (Browse & Discover Scenarios)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /marketplace"
+      },
+      {
+        "type": "action",
+        "description": "Wait for a rate-limit state to appear if triggered by normal use"
+      },
+      {
+        "type": "action",
+        "description": "Click the retry action on the rate-limit state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the marketplace either shows scenario results or continues to show a rate-limit state with a retry option"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC031",
+    "title": "AR view shows an empty-state when no nodes are available to render",
+    "description": "Verifies the AR view displays a clear empty-state instead of a broken scene when there are no nodes to visualize.",
+    "category": "AR Visualization",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the AR visualization page"
+      },
+      {
+        "type": "action",
+        "description": "Use in-page controls to filter or scope the displayed nodes to none (if available)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty-state message or placeholder is displayed for the AR visualization"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the AR scene does not show node overlays when no nodes are selected"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC032",
+    "title": "Sustainability dashboard offline summary state is recoverable by retry",
+    "description": "If sustainability data cannot be loaded, the UI shows an offline summary state and allows retry to attempt loading again.",
+    "category": "Sustainability Tracking",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /sustainability"
+      },
+      {
+        "type": "action",
+        "description": "Wait for an offline summary state to appear if triggered"
+      },
+      {
+        "type": "action",
+        "description": "Click the retry action from the offline summary state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the dashboard either shows sustainability KPIs or continues to show an offline summary state with a retry option"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC033",
+    "title": "Clear voice command history or session output",
+    "description": "Verifies the user can clear the current voice session output and the UI returns to an empty/ready state.",
+    "category": "Voice Interface",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the voice interface page"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid sample voice input option available in the UI"
+      },
+      {
+        "type": "action",
+        "description": "Submit the voice command for processing"
+      },
+      {
+        "type": "action",
+        "description": "Clear the current voice conversation or results"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the UI returns to an empty or ready-to-record state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no prior transcription or result content remains visible"
+      }
+    ],
+    "priority": "Low"
+  }
+]

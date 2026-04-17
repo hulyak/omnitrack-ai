@@ -193,7 +193,47 @@ The Strategy Agent has identified three viable mitigation approaches, with the r
 };
 
 export default function ExplainabilityPage() {
-  const [data] = useState<ExplainabilityData>(sampleExplainabilityData);
+  const [data, setData] = useState<ExplainabilityData>(sampleExplainabilityData);
+  const [disruptionType, setDisruptionType] = useState('Weather Event');
+  const [location, setLocation] = useState('Taiwan, Southeast Asia');
+  const [severity, setSeverity] = useState('HIGH');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [decisionId, setDecisionId] = useState('DEC-2026-0417-001');
+  const [decisionIdError, setDecisionIdError] = useState<string | null>(null);
+
+  const handleReanalyze = () => {
+    setDecisionIdError(null);
+    // Validate decision ID
+    const validIds = ['DEC-2026-0417-001', 'DEC-2026-0416-002', 'DEC-2026-0415-003'];
+    if (!validIds.includes(decisionId) && !decisionId.startsWith('DEC-')) {
+      setDecisionIdError(`Unknown decision identifier: "${decisionId}". Please enter a valid decision ID (e.g., DEC-2026-0417-001).`);
+      return;
+    }
+    setIsAnalyzing(true);
+    setTimeout(() => {
+      const severityConfidence = severity === 'HIGH' ? 0.87 : severity === 'MEDIUM' ? 0.72 : 0.58;
+      const severityLabel = severity === 'HIGH' ? 'HIGH' : severity === 'MEDIUM' ? 'MODERATE' : 'LOW';
+      const costMultiplier = severity === 'HIGH' ? 1.0 : severity === 'MEDIUM' ? 0.55 : 0.2;
+      const newConfidence = parseFloat((severityConfidence + (Math.random() * 0.08 - 0.04)).toFixed(2));
+      setData({
+        ...sampleExplainabilityData,
+        summary: `The AI analysis indicates a ${severityLabel} risk disruption scenario affecting your ${location} supply chain network. The primary concern is a ${disruptionType.toLowerCase()} disruption with ${severity.toLowerCase()} severity.\n\nOur multi-agent analysis reveals an estimated impact of $${(5.0 * costMultiplier).toFixed(1)}M in total costs. The Strategy Agent recommends a ${severity === 'HIGH' ? 'hybrid approach combining expedited air freight with alternative sourcing' : severity === 'MEDIUM' ? 'proactive monitoring with pre-positioned inventory buffers' : 'standard monitoring with existing contingency plans'}.`,
+        overallConfidence: newConfidence,
+        uncertaintyRanges: {
+          ...sampleExplainabilityData.uncertaintyRanges,
+          costImpact: {
+            ...sampleExplainabilityData.uncertaintyRanges.costImpact,
+            expected: Math.round(5000000 * costMultiplier),
+            bestCase: Math.round(3200000 * costMultiplier),
+            worstCase: Math.round(7800000 * costMultiplier),
+            confidence: newConfidence,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+      setIsAnalyzing(false);
+    }, 1500);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
@@ -273,21 +313,86 @@ export default function ExplainabilityPage() {
           </p>
         </div>
 
-        {/* Scenario Context */}
+        {/* Scenario Context - Editable */}
         <div className="mb-6 bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 p-6 hover:border-slate-700/50 transition-all duration-300">
-          <h2 className="text-xl font-bold text-white mb-6">Scenario Context</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">Scenario Context</h2>
+            <button
+              onClick={handleReanalyze}
+              disabled={isAnalyzing}
+              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isAnalyzing ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Re-analyze
+                </>
+              )}
+            </button>
+          </div>
+          {/* Decision Identifier */}
+          <div className="mb-6">
+            <label className="text-sm text-slate-400 font-medium mb-2 block">Decision Identifier</label>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={decisionId}
+                onChange={(e) => { setDecisionId(e.target.value); setDecisionIdError(null); }}
+                placeholder="Enter decision ID (e.g., DEC-2026-0417-001)"
+                className="flex-1 bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-500"
+              />
+            </div>
+            {decisionIdError && (
+              <p className="mt-2 text-sm text-red-400 bg-red-900/20 border border-red-500/50 rounded-lg px-3 py-2">{decisionIdError}</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <p className="text-sm text-slate-400 font-medium mb-1">Disruption Type</p>
-              <p className="text-lg font-bold text-white">Weather Event</p>
+              <label className="text-sm text-slate-400 font-medium mb-2 block">Disruption Type</label>
+              <select
+                value={disruptionType}
+                onChange={(e) => setDisruptionType(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option>Weather Event</option>
+                <option>Supplier Failure</option>
+                <option>Transportation Delay</option>
+                <option>Geopolitical Crisis</option>
+                <option>Demand Surge</option>
+                <option>Cyber Attack</option>
+              </select>
             </div>
             <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <p className="text-sm text-slate-400 font-medium mb-1">Location</p>
-              <p className="text-lg font-bold text-white">Taiwan, Southeast Asia</p>
+              <label className="text-sm text-slate-400 font-medium mb-2 block">Location</label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option>Taiwan, Southeast Asia</option>
+                <option>Shanghai, China</option>
+                <option>Germany, Europe</option>
+                <option>California, USA</option>
+                <option>Mumbai, India</option>
+              </select>
             </div>
-            <div className="p-4 bg-red-900/20 rounded-xl border border-red-500/50">
-              <p className="text-sm text-red-400 font-medium mb-1">Severity</p>
-              <p className="text-lg font-bold text-red-400">HIGH</p>
+            <div className={`p-4 rounded-xl border ${severity === 'HIGH' ? 'bg-red-900/20 border-red-500/50' : severity === 'MEDIUM' ? 'bg-yellow-900/20 border-yellow-500/50' : 'bg-green-900/20 border-green-500/50'}`}>
+              <label className={`text-sm font-medium mb-2 block ${severity === 'HIGH' ? 'text-red-400' : severity === 'MEDIUM' ? 'text-yellow-400' : 'text-green-400'}`}>Severity</label>
+              <select
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option>HIGH</option>
+                <option>MEDIUM</option>
+                <option>LOW</option>
+              </select>
             </div>
           </div>
         </div>

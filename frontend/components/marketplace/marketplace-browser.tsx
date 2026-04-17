@@ -12,6 +12,7 @@ export function MarketplaceBrowser() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [filters, setFilters] = useState<SearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('Most Popular');
 
   useEffect(() => {
     loadScenarios();
@@ -19,7 +20,7 @@ export function MarketplaceBrowser() {
 
   useEffect(() => {
     applyFilters();
-  }, [scenarios, filters]);
+  }, [scenarios, filters, sortBy]);
 
   const loadScenarios = async () => {
     try {
@@ -75,6 +76,25 @@ export function MarketplaceBrowser() {
       );
     }
 
+    // Apply sorting - use actual API field names with fallbacks
+    const getDownloads = (s: MarketplaceScenario) => (s.marketplaceMetadata as any).downloads ?? s.marketplaceMetadata.usageCount ?? 0;
+    const getPublishedAt = (s: MarketplaceScenario) => (s.marketplaceMetadata as any).publishedAt ?? (s as any).createdAt ?? '';
+    switch (sortBy) {
+      case 'Highest Rated':
+        filtered.sort((a, b) => b.marketplaceMetadata.rating - a.marketplaceMetadata.rating);
+        break;
+      case 'Most Recent':
+        filtered.sort((a, b) => new Date(getPublishedAt(b)).getTime() - new Date(getPublishedAt(a)).getTime());
+        break;
+      case 'Most Downloads':
+        filtered.sort((a, b) => getDownloads(b) - getDownloads(a));
+        break;
+      case 'Most Popular':
+      default:
+        filtered.sort((a, b) => (getDownloads(b) + b.marketplaceMetadata.rating * 100) - (getDownloads(a) + a.marketplaceMetadata.rating * 100));
+        break;
+    }
+
     setFilteredScenarios(filtered);
   };
 
@@ -98,12 +118,13 @@ export function MarketplaceBrowser() {
   }
 
   if (error) {
+    const isRateLimit = error.toLowerCase().includes('rate') || error.toLowerCase().includes('429') || error.toLowerCase().includes('too many');
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center bg-red-900/20 border border-red-500/50 rounded-2xl p-8">
-          <div className="text-red-400 text-4xl mb-4">⚠️</div>
-          <p className="text-white font-medium text-lg">Failed to load marketplace</p>
-          <p className="text-slate-300 mt-2">{error}</p>
+        <div className={`text-center rounded-2xl p-8 ${isRateLimit ? 'bg-yellow-900/20 border border-yellow-500/50' : 'bg-red-900/20 border border-red-500/50'}`}>
+          <div className={`text-4xl mb-4 ${isRateLimit ? 'text-yellow-400' : 'text-red-400'}`}>{isRateLimit ? '⏳' : '⚠️'}</div>
+          <p className="text-white font-medium text-lg">{isRateLimit ? 'Rate limit exceeded' : 'Failed to load marketplace'}</p>
+          <p className="text-slate-300 mt-2">{isRateLimit ? 'Too many requests. Please wait a moment and try again.' : error}</p>
           <button
             onClick={loadScenarios}
             className="mt-6 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-medium transition-all"
@@ -147,7 +168,35 @@ export function MarketplaceBrowser() {
         </div>
       </div>
 
-      {/* Results Count & View Toggle */}
+      {/* Industry Filter Tags */}
+      <div className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-400 mr-1">Filter by industry:</span>
+          {Array.from(new Set(scenarios.map((s) => s.marketplaceMetadata.industry))).map((industry) => (
+            <button
+              key={industry}
+              onClick={() => setFilters({ ...filters, industry: filters.industry === industry ? undefined : industry })}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                filters.industry === industry
+                  ? 'bg-purple-600 text-white border border-purple-500'
+                  : 'bg-slate-800/50 text-slate-300 border border-slate-700 hover:border-purple-500 hover:text-purple-300'
+              }`}
+            >
+              {industry}
+            </button>
+          ))}
+          {(filters.industry || filters.searchQuery || filters.tags?.length) && (
+            <button
+              onClick={() => setFilters({})}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/30 text-red-400 border border-red-500/50 hover:bg-red-900/50 transition-all cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Results Count & Sort */}
       <div className="mb-6 flex items-center justify-between">
         <div className="text-sm text-slate-300 font-medium">
           Showing <span className="text-purple-400 font-bold">{filteredScenarios.length}</span> of{' '}
@@ -155,7 +204,11 @@ export function MarketplaceBrowser() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400 mr-2">Sort by:</span>
-          <select className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+          >
             <option>Most Popular</option>
             <option>Highest Rated</option>
             <option>Most Recent</option>
@@ -181,13 +234,16 @@ export function MarketplaceBrowser() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredScenarios.map((scenario) => (
             <div
-              key={scenario.scenarioId}
+              key={scenario.scenarioId || (scenario as any).id}
               className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 hover:border-purple-500/50 transition-all duration-300 overflow-hidden flex flex-col"
             >
 
               <div className="p-6 flex flex-col flex-1">
                 {/* Title */}
-                <h3 className="text-xl font-bold text-white mb-3 hover:text-purple-400 transition-colors cursor-pointer">
+                <h3
+                  onClick={() => { window.location.href = `/marketplace/${scenario.scenarioId || (scenario as any).id}`; }}
+                  className="text-xl font-bold text-white mb-3 hover:text-purple-400 transition-colors cursor-pointer"
+                >
                   {scenario.marketplaceMetadata.title}
                 </h3>
 
@@ -215,7 +271,7 @@ export function MarketplaceBrowser() {
                       ⭐ {scenario.marketplaceMetadata.rating.toFixed(1)}
                     </span>
                     <span className="flex items-center gap-1 text-blue-400 font-medium">
-                      📥 {scenario.marketplaceMetadata.usageCount}
+                      📥 {(scenario.marketplaceMetadata as any).downloads ?? scenario.marketplaceMetadata.usageCount ?? 0}
                     </span>
                   </div>
                   <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded border border-purple-500/50 whitespace-nowrap">
