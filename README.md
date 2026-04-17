@@ -1,5 +1,7 @@
 # OmniTrack AI - Supply Chain Resilience Platform
 
+[![Demo Video](https://img.youtube.com/vi/uI3CdyGWZkE/maxresdefault.jpg)](https://www.youtube.com/watch?v=uI3CdyGWZkE)
+
 ## What is OmniTrack AI?
 
 OmniTrack AI is an autonomous multi-agent system that transforms supply chain management from reactive crisis response to proactive resilience. Four specialized AI agents work together to detect disruptions 10x faster and respond 50x faster than traditional systems.
