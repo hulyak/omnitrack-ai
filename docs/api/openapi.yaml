@@ -1,0 +1,960 @@
+openapi: 3.0.3
+info:
+  title: OmniTrack AI Supply Chain Resilience Platform API
+  description: |
+    REST API for the OmniTrack AI platform, providing endpoints for supply chain digital twin management,
+    scenario simulation, marketplace operations, sustainability tracking, and real-time alerts.
+  version: 1.0.0
+  contact:
+    name: OmniTrack AI Support
+    email: support@omnitrack.ai
+
+servers:
+  - url: https://api.omnitrack.ai/v1
+    description: Production server
+  - url: https://staging-api.omnitrack.ai/v1
+    description: Staging server
+  - url: http://localhost:3000/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Digital Twin
+    description: Supply chain digital twin operations
+  - name: Scenarios
+    description: Disruption scenario simulation
+  - name: Alerts
+    description: Real-time alert management
+  - name: Marketplace
+    description: Community scenario marketplace
+  - name: Sustainability
+    description: Environmental impact tracking
+  - name: Learning
+    description: Feedback and model improvement
+  - name: Voice
+    description: Voice command interface
+
+security:
+  - BearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate current session
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  # Digital Twin Endpoints
+  /digital-twin/state:
+    get:
+      tags:
+        - Digital Twin
+      summary: Get current digital twin state
+      description: Retrieve the current state of the supply chain digital twin
+      responses:
+        '200':
+          description: Digital twin state retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigitalTwinState'
+
+  /digital-twin/nodes/{id}:
+    get:
+      tags:
+        - Digital Twin
+      summary: Get node details
+      description: Retrieve detailed information about a specific supply chain node
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /digital-twin/refresh:
+    put:
+      tags:
+        - Digital Twin
+      summary: Refresh digital twin
+      description: Trigger manual refresh of digital twin from data sources
+      responses:
+        '202':
+          description: Refresh initiated
+
+  # Scenario Endpoints
+  /scenarios/simulate:
+    post:
+      tags:
+        - Scenarios
+      summary: Run scenario simulation
+      description: Execute a disruption scenario simulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScenarioRequest'
+      responses:
+        '200':
+          description: Simulation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /scenarios/{id}:
+    get:
+      tags:
+        - Scenarios
+      summary: Get scenario details
+      description: Retrieve details of a specific scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scenario retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+
+  /scenarios/{id}/results:
+    get:
+      tags:
+        - Scenarios
+      summary: Get scenario results
+      description: Retrieve simulation results for a scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResult'
+
+  /scenarios/{id}/feedback:
+    post:
+      tags:
+        - Scenarios
+      summary: Submit scenario feedback
+      description: Provide feedback on scenario accuracy after real events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+      responses:
+        '201':
+          description: Feedback submitted
+
+  # Alert Endpoints
+  /alerts:
+    get:
+      tags:
+        - Alerts
+      summary: List alerts
+      description: Retrieve list of alerts with optional filtering
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, acknowledged, resolved]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Alerts retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+                  nextToken:
+                    type: string
+
+  /alerts/{id}/acknowledge:
+    put:
+      tags:
+        - Alerts
+      summary: Acknowledge alert
+      description: Mark an alert as acknowledged
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert acknowledged
+
+  /alerts/subscribe:
+    post:
+      tags:
+        - Alerts
+      summary: Subscribe to alerts
+      description: Configure alert notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channels:
+                  type: array
+                  items:
+                    type: string
+                    enum: [email, slack, teams, mobile]
+                severityThreshold:
+                  type: string
+                  enum: [critical, high, medium, low]
+      responses:
+        '200':
+          description: Subscription updated
+
+  # Marketplace Endpoints
+  /marketplace/scenarios:
+    get:
+      tags:
+        - Marketplace
+      summary: List marketplace scenarios
+      description: Browse scenarios in the community marketplace
+      parameters:
+        - name: industry
+          in: query
+          schema:
+            type: string
+        - name: disruptionType
+          in: query
+          schema:
+            type: string
+        - name: geography
+          in: query
+          schema:
+            type: string
+        - name: minRating
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scenarios retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenarios:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketplaceScenario'
+
+    post:
+      tags:
+        - Marketplace
+      summary: Publish scenario
+      description: Publish a scenario to the marketplace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketplaceScenarioCreate'
+      responses:
+        '201':
+          description: Scenario published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceScenario'
+
+  /marketplace/scenarios/{id}:
+    get:
+      tags:
+        - Marketplace
+      summary: Get marketplace scenario
+      description: Retrieve detailed information about a marketplace scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scenario retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceScenario'
+
+  /marketplace/scenarios/{id}/rating:
+    put:
+      tags:
+        - Marketplace
+      summary: Rate scenario
+      description: Submit or update rating for a marketplace scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - score
+              properties:
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                review:
+                  type: string
+      responses:
+        '200':
+          description: Rating submitted
+
+  /marketplace/scenarios/{id}/fork:
+    post:
+      tags:
+        - Marketplace
+      summary: Fork scenario
+      description: Create a customized version of a marketplace scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modifications:
+                  type: object
+                title:
+                  type: string
+      responses:
+        '201':
+          description: Scenario forked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+
+  # Sustainability Endpoints
+  /sustainability/metrics:
+    get:
+      tags:
+        - Sustainability
+      summary: Get sustainability metrics
+      description: Retrieve current environmental impact metrics
+      responses:
+        '200':
+          description: Metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SustainabilityMetrics'
+
+  /sustainability/trends:
+    get:
+      tags:
+        - Sustainability
+      summary: Get sustainability trends
+      description: Retrieve historical trend data for environmental metrics
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: granularity
+          in: query
+          schema:
+            type: string
+            enum: [hourly, daily, weekly, monthly]
+            default: daily
+      responses:
+        '200':
+          description: Trends retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dataPoints:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SustainabilityDataPoint'
+
+  /sustainability/comparison:
+    post:
+      tags:
+        - Sustainability
+      summary: Compare strategies
+      description: Compare environmental impact of different mitigation strategies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                strategies:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Comparison completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comparisons:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StrategyComparison'
+
+  # Learning Endpoints
+  /learning/feedback:
+    post:
+      tags:
+        - Learning
+      summary: Submit feedback
+      description: Provide feedback for model improvement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+      responses:
+        '201':
+          description: Feedback submitted
+
+  /learning/metrics:
+    get:
+      tags:
+        - Learning
+      summary: Get model metrics
+      description: Retrieve model performance metrics and trends
+      responses:
+        '200':
+          description: Metrics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accuracy:
+                    type: number
+                  precision:
+                    type: number
+                  recall:
+                    type: number
+                  trends:
+                    type: array
+                    items:
+                      type: object
+
+  # Voice Endpoints
+  /voice/command:
+    post:
+      tags:
+        - Voice
+      summary: Process voice command
+      description: Submit voice command for processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - audioData
+              properties:
+                audioData:
+                  type: string
+                  format: base64
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Command processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intent:
+                    type: string
+                  response:
+                    type: string
+                  audioResponse:
+                    type: string
+                    format: base64
+                  visualData:
+                    type: object
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, analyst, viewer]
+        preferences:
+          type: object
+
+    DigitalTwinState:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        connections:
+          type: array
+          items:
+            type: object
+        metrics:
+          type: object
+
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [supplier, manufacturer, warehouse, distributor, retailer]
+        location:
+          type: object
+          properties:
+            latitude:
+              type: number
+            longitude:
+              type: number
+            address:
+              type: string
+        capacity:
+          type: number
+        status:
+          type: string
+          enum: [operational, degraded, disrupted, offline]
+        metrics:
+          type: object
+
+    ScenarioRequest:
+      type: object
+      required:
+        - type
+        - location
+        - severity
+      properties:
+        type:
+          type: string
+          enum: [natural_disaster, supplier_failure, transportation_disruption, demand_spike, quality_issue]
+        location:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        duration:
+          type: integer
+          description: Duration in hours
+        affectedNodes:
+          type: array
+          items:
+            type: string
+        parameters:
+          type: object
+
+    Scenario:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        parameters:
+          type: object
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        isPublic:
+          type: boolean
+
+    SimulationResult:
+      type: object
+      properties:
+        scenarioId:
+          type: string
+        impacts:
+          type: object
+          properties:
+            cost:
+              type: number
+            deliveryTime:
+              type: number
+            inventoryLevel:
+              type: number
+            carbonFootprint:
+              type: number
+        strategies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Strategy'
+        decisionTree:
+          type: object
+        confidence:
+          type: number
+        executionTime:
+          type: number
+
+    Strategy:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        impacts:
+          type: object
+        tradeoffs:
+          type: object
+        confidence:
+          type: number
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low]
+        nodeId:
+          type: string
+        status:
+          type: string
+          enum: [active, acknowledged, resolved]
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        acknowledgedBy:
+          type: string
+        acknowledgedAt:
+          type: string
+          format: date-time
+
+    MarketplaceScenario:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        rating:
+          type: number
+        usageCount:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        industry:
+          type: string
+        disruptionType:
+          type: string
+        geography:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    MarketplaceScenarioCreate:
+      type: object
+      required:
+        - title
+        - description
+        - scenarioId
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        scenarioId:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        industry:
+          type: string
+        disruptionType:
+          type: string
+        geography:
+          type: string
+
+    SustainabilityMetrics:
+      type: object
+      properties:
+        carbonFootprint:
+          type: number
+          description: Total carbon footprint in kg CO2e
+        emissionsByRoute:
+          type: object
+        sustainabilityScore:
+          type: number
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    SustainabilityDataPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        carbonFootprint:
+          type: number
+        sustainabilityScore:
+          type: number
+
+    StrategyComparison:
+      type: object
+      properties:
+        strategyId:
+          type: string
+        strategyName:
+          type: string
+        cost:
+          type: number
+        risk:
+          type: number
+        carbonFootprint:
+          type: number
+        sustainabilityScore:
+          type: number
+
+    Feedback:
+      type: object
+      required:
+        - scenarioId
+        - actualOutcome
+      properties:
+        scenarioId:
+          type: string
+        actualOutcome:
+          type: object
+        accuracy:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comments:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: object
+
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string

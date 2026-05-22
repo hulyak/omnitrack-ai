@@ -1,0 +1,12 @@
+{
+  "name": "omnitrack-agent-demo",
+  "version": "1.0.0",
+  "description": "Local agent demo runner for hackathon",
+  "scripts": {
+    "demo": "ts-node run-agents-locally.ts"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3"
+  }
+}

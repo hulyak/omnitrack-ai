@@ -1,0 +1,14 @@
+{
+  "name": "CDK Synth Check",
+  "description": "Validate AWS CDK infrastructure when infrastructure files are saved",
+  "enabled": true,
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "infrastructure/**/*.ts"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npx cdk synth --quiet",
+    "workingDirectory": "infrastructure"
+  }
+}
